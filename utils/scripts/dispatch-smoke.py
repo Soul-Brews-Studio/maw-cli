@@ -69,7 +69,8 @@ sys.exit(7)
     passthrough = ["two words", "", "*.go", "$(touch injected)", "--", "-h"]
     result = run(["probe"] + passthrough, 7, stdin="hello stdin\n")
     assert json.loads(result.stdout) == dict(argv=[str(probe / "entry.mjs")] + passthrough,
-        stdin="hello stdin\n", cwd=str(root), value="unchanged"), result.stdout
+        # getcwd resolves directory symlinks, including macOS /var -> /private/var.
+        stdin="hello stdin\n", cwd=str(root.resolve()), value="unchanged"), result.stdout
     assert result.stderr == "plugin stderr\n", result.stderr
     assert not (root / "injected").exists()
     for args in (["probe", "--help"], ["help", "probe"]):
@@ -132,6 +133,8 @@ sys.exit(7)
     runtime.write_text("#!/nonexistent-maw-dispatch-interpreter\n")
     result = run(["probe"], 126)
     assert "cannot execute" in result.stderr, result.stderr
+    assert str(runtime) in result.stderr or str(runtime.resolve()) in result.stderr, result.stderr
+    assert result.stderr.rsplit(": ", 1)[-1].strip(), result.stderr
     assert not marker.exists()
     runtime.write_text(runtime_source)
 
@@ -145,7 +148,7 @@ console.error('real Bun stderr');
 process.exitCode=9;
 """)
         result = run(["probe"] + passthrough, 9, stdin="actual input")
-        assert json.loads(result.stdout) == dict(args=passthrough, input="actual input", cwd=str(root))
+        assert json.loads(result.stdout) == dict(args=passthrough, input="actual input", cwd=str(root.resolve()))
         assert result.stderr == "real Bun stderr\n"
 
 print("dispatch smoke: installed Bun scripts, alias/help, args/streams/cwd/exit, gating and precedence OK")
