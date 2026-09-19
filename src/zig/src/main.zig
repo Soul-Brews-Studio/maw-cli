@@ -30,6 +30,7 @@ const Host = struct {
         if (args.len == 0) {
             try self.output(.stdout(), "Usage: maw <command> [args]\n\nCommands:\n", .{});
             for (self.commands) |command| {
+                if (eql(command.name, "plugins")) continue;
                 try self.output(.stdout(), "  {s: <12} {s}\n", .{ command.name, command.summary });
             }
             try self.output(.stdout(), "\nRun 'maw help <command>' for command help.\nPlugins: executable maw-<command> files in absolute PATH directories.\n", .{});

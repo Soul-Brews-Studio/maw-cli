@@ -19,6 +19,9 @@ func (*plugin) Run(ctx context.Context, i *command.Invocation) int {
 	if len(i.Args) == 0 {
 		fmt.Fprintln(i.Stdout, "Usage: maw <command> [args]\n\nCommands:")
 		for _, cmd := range i.Commands {
+			if cmd.Name == "plugins" {
+				continue
+			}
 			fmt.Fprintf(i.Stdout, "  %-12s %s\n", cmd.Name, cmd.Summary)
 		}
 		fmt.Fprintln(i.Stdout, "\nRun 'maw help <command>' for command help.\nPlugins: executable maw-<command> files in absolute PATH directories.")

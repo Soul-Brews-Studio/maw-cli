@@ -27,6 +27,9 @@ fn help(registry: &Registry, args: &[OsString]) -> i32 {
     if args.is_empty() {
         println!("Usage: maw <command> [args]\n\nCommands:");
         for (name, command) in registry {
+            if name == "plugins" {
+                continue;
+            }
             println!("  {:12} {}", name, command.summary);
         }
         println!("\nRun 'maw help <command>' for command help.\nPlugins: executable maw-<command> files in absolute PATH directories.");
