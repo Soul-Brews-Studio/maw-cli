@@ -1,4 +1,5 @@
 import { discover, execute } from "./plugins";
+import { indexTrace } from "./index";
 
 type Command = {
   name: string;
@@ -34,6 +35,9 @@ export async function run(args: string[]): Promise<number> {
     return 0;
   };
   registry.set("help", { name: "help", summary: "Show command help", usage: "maw help [command]", run: help });
+  registry.set("index", {
+    name: "index", summary: "Index MCP-shaped JSONL context records", usage: "maw index FILE|-", run: indexTrace,
+  });
   registry.set("version", {
     name: "version", summary: "Show maw version", usage: "maw version",
     run: (args) => {

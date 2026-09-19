@@ -4,6 +4,8 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[dependencies]
+serde_json = "=1.0.108"
+
 [profile.release]
 strip = true
-

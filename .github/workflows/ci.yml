@@ -40,20 +40,26 @@ jobs:
               go version
               /usr/bin/time -p go -C go build -o ../bin/maw-go ./cmd/maw
               sh scripts/smoke.sh "$PWD/bin/maw-go"
+              go -C go vet ./...
+              python3 scripts/mcp-smoke.py "$PWD/bin/maw-go"
+              python3 scripts/index-smoke.py -- "$PWD/bin/maw-go"
               ;;
             rs)
               rustup run 1.69.0 rustc --version
-              /usr/bin/time -p rustup run 1.69.0 cargo build --release --manifest-path rs/Cargo.toml
+              /usr/bin/time -p rustup run 1.69.0 cargo build --locked --release --manifest-path rs/Cargo.toml
               sh scripts/smoke.sh "$PWD/rs/target/release/maw-rs"
+              python3 scripts/index-smoke.py -- "$PWD/rs/target/release/maw-rs"
               ;;
             js)
               bun --version
               /usr/bin/time -p bun build js/src/cli.ts --target=bun --outdir js/dist
               sh scripts/smoke.sh "$(command -v bun)" "$PWD/js/dist/cli.js"
+              python3 scripts/index-smoke.py -- "$(command -v bun)" "$PWD/js/dist/cli.js"
               ;;
             zig)
               zig version
               (cd zig && /usr/bin/time -p zig build -Doptimize=ReleaseFast)
               sh scripts/smoke.sh "$PWD/zig/zig-out/bin/maw-zig"
+              python3 scripts/index-smoke.py -- "$PWD/zig/zig-out/bin/maw-zig"
               ;;
           esac

@@ -1,5 +1,6 @@
 const std = @import("std");
 const registry = @import("registry.zig");
+const trace_index = @import("index.zig");
 
 const Host = struct {
     allocator: std.mem.Allocator,
@@ -69,6 +70,13 @@ const Host = struct {
         switch (command.kind) {
             .help => return self.help(args[1..]),
             .external => return self.execute(command.path, args[1..]),
+            .index => {
+                if (args.len != 2) return self.fail("usage: maw index FILE|-");
+                trace_index.run(self.allocator, self.io, args[1]) catch |err| {
+                    try self.output(.stderr(), "maw: index: {s}\n", .{@errorName(err)});
+                    return 1;
+                };
+            },
             .version => {
                 if (args.len != 1) return self.fail("usage: maw version");
                 try self.output(.stdout(), "maw dev\n", .{});

@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const Kind = enum { help, version, plugins, external };
+pub const Kind = enum { help, version, plugins, index, external };
 pub const Command = struct {
     name: []const u8,
     summary: []const u8,
@@ -33,6 +33,7 @@ pub fn discover(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]C
     var commands: std.ArrayList(Command) = .empty;
     try commands.appendSlice(allocator, &.{
         .{ .name = "help", .summary = "Show command help", .usage = "maw help [command]", .kind = .help },
+        .{ .name = "index", .summary = "Index MCP context JSONL", .usage = "maw index FILE|-", .kind = .index },
         .{ .name = "version", .summary = "Show maw version", .usage = "maw version", .kind = .version },
         .{ .name = "plugins", .summary = "List commands and executable plugin paths", .usage = "maw plugins", .kind = .plugins },
     });

@@ -57,7 +57,7 @@ def commands(language, scratch=None):
             env["GOCACHE"] = str(scratch / "cache")
     elif language == "rs":
         target = scratch / "target" if scratch else ROOT / "rs/target"
-        build = [tool("cargo"), "build", "--release", "--manifest-path", str(ROOT / "rs/Cargo.toml")]
+        build = [tool("cargo"), "build", "--locked", "--release", "--manifest-path", str(ROOT / "rs/Cargo.toml")]
         env["CARGO_TARGET_DIR"] = str(target)
         run = [str(target / "release/maw-rs")]
     elif language == "js":

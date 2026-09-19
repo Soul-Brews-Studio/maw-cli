@@ -53,6 +53,11 @@ pub fn run(args: Vec<OsString>) -> i32 {
         ("help", "Show command help", "maw help [command]"),
         ("version", "Show maw version", "maw version"),
         (
+            "index",
+            "Index normalized MCP JSONL context",
+            "maw index FILE|-",
+        ),
+        (
             "plugins",
             "List commands and executable plugin paths",
             "maw plugins",
@@ -98,6 +103,9 @@ pub fn run(args: Vec<OsString>) -> i32 {
     }
     if name == "help" {
         return help(&registry, &args[1..]);
+    }
+    if name == "index" {
+        return crate::index::run(&args[1..]);
     }
     if args.len() != 1 {
         return fail(&format!("usage: {}", command.usage));
