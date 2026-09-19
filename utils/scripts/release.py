@@ -68,8 +68,9 @@ def prepare(ci_run):
     base = calculator(evidence["created_at"])
     year, month, day, minute = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)-alpha\.(\d+)", base).groups()
     # Translate the upstream date into a v0-compatible nested Go-module label.
-    go_version = f"v0.{2000 + int(year):04d}{int(month):02d}{int(day):02d}.{int(minute)}-alpha.{ci_run}"
-    return dict(schema="maw.release.v1", skip=False, tag=f"{base}.{ci_run}",
+    go_version = f"v0.{2000 + int(year):04d}{int(month):02d}{int(day):02d}.{int(minute)}-alpha"
+    # CI identity stays in provenance; the public selector is date + wall-clock minute.
+    return dict(schema="maw.release.v1", skip=False, tag=base,
         go_version=go_version, go_tag=f"src/go/{go_version}", commit=commit,
         ci_run=int(ci_run), archives=[f"maw-{language}-{system}-{arch}.tar.gz"
             for language in ("go", "rs", "js", "zig")
@@ -236,7 +237,7 @@ def main():
         result = publish(args.plan, args.assets)
     else:
         result = dict(mode="preview", tag=calculator(), commit=run("git", "rev-parse", "HEAD"),
-            calculator=f"{UPSTREAM}@{SNAPSHOT}", warning="read-only preview; successful alpha CI publishes run-qualified tags")
+            calculator=f"{UPSTREAM}@{SNAPSHOT}", warning="read-only preview; successful alpha CI publishes date-time tags")
     print(canonical(result).decode(), end="")
 
 

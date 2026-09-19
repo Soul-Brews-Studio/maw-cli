@@ -32,8 +32,8 @@ def main():
     parser.add_argument("--os", choices=("linux", "darwin"), required=True)
     parser.add_argument("--arch", choices=("amd64", "arm64"), required=True)
     args = parser.parse_args()
-    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+(?:\.[0-9]+)?", args.version):
-        parser.error("version must be an alpha CalVer tag: vYY.M.D-alpha.HHMM[.RUN_ID]")
+    if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+", args.version):
+        parser.error("version must be an alpha CalVer tag: vYY.M.D-alpha.HMM (no run-ID suffix)")
     if not re.fullmatch(r"[0-9a-f]{40}", args.commit):
         parser.error("commit must be a full lowercase 40-character SHA")
     host_arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine().lower())
