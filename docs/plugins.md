@@ -39,8 +39,13 @@ the same plugin with `--help`; use root help/list if no external execution is wa
 
 Host usage errors return **2**. An external process's ordinary exit status is
 preserved. A launch failure returns **126**. Cancellation or abnormal termination
-returns nonzero. The host passes interrupt cancellation to its direct child;
-long-running plugins own their descendant-process shutdown strategy.
+returns nonzero. Go and Bun explicitly cancel/signal the direct child on host
+interrupt. The standard-library Rust and Zig ports currently rely on terminal
+process-group signals; signaling only the host PID does not guarantee child
+shutdown. All plugins own their descendant-process shutdown strategy.
+
+Linux/macOS are the shared smoke targets. Windows discovery code is present in
+the Go/Rust/Bun ports but cross-runtime Windows behavior is not yet validated.
 
 ## Future command catalog — not implemented
 
@@ -68,7 +73,7 @@ are maw-herdr design decisions, not upstream behavior claims.
 ## Adding a built-in
 
 Only host-essential commands should be built in. Add one descriptor/handler to
-the registry in `internal/cli`, with usage, summary and argument validation.
+the registry in `go/internal/cli`, with usage, summary and argument validation.
 Smoke-call it now; unit tests wait for the user's explicit mark.
 It automatically participates in help/listing; no separate help catalog to edit.
 Prefer an external plugin for operational commands so the host stays lean.

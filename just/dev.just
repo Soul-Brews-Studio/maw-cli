@@ -1,13 +1,20 @@
 set working-directory := '..'
 
-# Compile once, using Go's normal build cache.
+# Build the core Go implementation.
 build:
-    go build -o bin/maw ./cmd/maw
+    just go build
 
 # Smoke an already compiled binary; no unit tests.
 smoke:
-    sh scripts/smoke.sh
+    just go smoke
 
 # Time one compile-and-smoke iteration.
 check:
-    sh scripts/check.sh
+    just go check
+
+# Compile and smoke all four independent implementations.
+all:
+    just go check
+    just rs check
+    just js check
+    just zig check

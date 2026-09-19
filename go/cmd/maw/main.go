@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 
-	"github.com/Soul-Brews-Studio/maw-herdr/internal/cli"
+	"github.com/Soul-Brews-Studio/maw-herdr/go/internal/cli"
 )
 
 func main() {
