@@ -25,6 +25,10 @@ Rust uses the user-approved `serde_json` for installed-plugin metadata; the
 other ports use their standard JSON parsers. The Rust lockfile keeps `ryu` at
 1.0.20 for Rust 1.69 compatibility. Shared smoke includes a temporary global
 plugin/config fixture and proves listing does not load code or write state.
+`dispatch-smoke.py` checks installed-script selection, disabled/ABI/entry/runtime
+gates, PATH precedence, explicit help, literal argv, streams, terminal stdin,
+working directory and exit status. A tiny runtime stand-in keeps native CI lanes
+independent of Bun; when Bun is installed it also runs a real JS entrypoint.
 
 ## Measure
 

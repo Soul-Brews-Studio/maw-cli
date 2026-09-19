@@ -44,6 +44,11 @@ JavaScript uses one named function per `mod.<function>.ts`; `mod.run` assembles
 the command registry; `mod.listPlugins` serves `plugin ls` and its plural aliases
 through separate static inventory path/config/JSON/format helpers. Go, Rust and
 Zig independently implement the same [global inventory contract](installed-plugin-listing.md).
+Unknown-command dispatch reuses that inventory for explicitly declared standalone
+Bun CLIs. Go calls `commands/plugins.ExecuteInstalled`, Rust `inventory::execute`,
+Bun `mod.executeInstalled` → `mod.findBun`/`mod.execute`, and Zig
+`inventory.resolve` → `Host.execute`. This fallback runs after built-ins/PATH;
+it does not import plugin modules or turn listing into runtime loading.
 Root `package.json` exposes the Bun entrypoint as `maw-js` for direct GitHub bunx.
 Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark
