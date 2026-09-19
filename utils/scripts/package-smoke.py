@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="maw-package-") as temporary:
     package.mkdir()
     shutil.copy2(ROOT / "package.json", package / "package.json")
     shutil.copytree(ROOT / "src/js/src", package / "src/js/src")
-    env = dict(os.environ, BUN_INSTALL_CACHE_DIR=str(work / "cache"), BUN_TMPDIR=str(work / "tmp"))
+    env = dict(os.environ, BUN_INSTALL_CACHE_DIR=str(work / "cache"), TMPDIR=str(work / "tmp"))
     (work / "tmp").mkdir()
     command = ["bun", "x", "--bun", "--package", str(package), "maw-js"]
     for args, expected in ((["--help"], "Usage: maw"), (["version"], "maw dev"),
