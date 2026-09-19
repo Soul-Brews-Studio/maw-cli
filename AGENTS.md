@@ -83,8 +83,9 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 - Basic Git lifecycle belongs to maw-cli, not individual plugins: `marketplace`
   is a static source list; explicit `plugin install/update/info/check` use Git's
   origin/HEAD rather than new registry/lock machinery. Follow
-  docs/plugin-lifecycle.md. No automatic builds, hooks, background updates or
-  native downloads. Preserve pins, refuse dirty/non-fast-forward updates, and
+  docs/plugin-lifecycle.md. No automatic builds, hooks or background updates.
+  Explicit Go tarball installs may download packaged native helpers as below.
+  Preserve Git pins, refuse dirty/non-fast-forward Git updates, and
   validate candidate metadata before mutation. Label the entry Git blob hash
   honestly; it is not a SHA-256 package checksum or publisher signature. Keep all
   ports covered by utils/scripts/lifecycle-smoke.py; no new unit framework.
@@ -93,6 +94,15 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   listing read-only, report unavailable/corrupt Git metadata honestly, and do
   not claim these additional forms exist in other ports. Cover them with the
   marketplace-smoke.py and selector-smoke.py actual-process fixtures.
+- Go `plugin install FILE.tar.gz|HTTPS.tar.gz [--backup|--replace]` is the explicit
+  no-Git package path. Follow docs/plugin-lifecycle.md: bounded private staging,
+  safe extraction and metadata/artifact validation before any replacement.
+  Interactive default backs up outside the active plugin root; noninteractive
+  replacement needs an explicit flag. Preserve rollback copies on failure,
+  respect path overrides, share install/update locks, and never run builds or
+  package code during install. Archive info/check/update remain Git-only; direct
+  archive users to reinstall. Source tarballs do not contain native helpers just
+  because they came from GitHub. Cover with archive-smoke.py actual processes.
 - Go `update` self-replaces from published maw-cli alpha assets using only the
   standard library. Follow docs/self-update.md: bounded HTTPS, archive/metadata
   checksums, exact candidate version proof before single-rename replacement,

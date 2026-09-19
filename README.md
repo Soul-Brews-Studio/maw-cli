@@ -255,6 +255,58 @@ changes plugin state.
 
 ### Install, update, and check
 
+#### Tarball installation (Go only, no Git required)
+
+Use a current `maw-go` with `FILE.tar.gz` in `maw-go help plugin`. The older
+pinned `v26.9.19-alpha.2047` example above predates this feature; bootstrap from
+`alpha` if needed:
+
+```sh
+GOBIN="$HOME/.local/bin" go install github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Install a downloaded `.tar.gz`/`.tgz`, or supply a trusted HTTPS tarball URL:
+
+```sh
+maw-go plugin install ./maw-herdr-plugin-darwin-arm64.tar.gz
+# Noninteractive replacement, keeping the previous plugin:
+maw-go plugin install ./maw-herdr-plugin-darwin-arm64.tar.gz --backup
+```
+
+When the plugin already exists, the terminal asks **Back up and replace**
+(default), **Replace without backup**, or **Cancel**. Scripts must explicitly
+use `--backup` or `--replace`; EOF cancels. Validation happens before replacement.
+The command prints the actual destination and backup path. Backups live outside
+the active plugin root, normally `~/.maw/plugins-backups/`; existing path settings
+such as `MAW_HOME` and `MAW_PLUGINS_DIR` are honored, including direnv overrides.
+
+For ready-to-run Herdr, download the matching `maw-herdr-plugin-<os>-<arch>`
+artifact from a successful [Herdr serve build](https://github.com/Soul-Brews-Studio/maw-herdr-plugin/actions/workflows/serve.yml).
+Extract the outer Actions ZIP first, then pass its `.tar.gz` to the command above.
+These are expiring CI artifacts, not published release URLs. Apple Silicon uses
+`darwin-arm64`; Intel Mac uses `darwin-amd64`. The package includes the server;
+no Git or Go compiler is needed to install/run it (Bun and Herdr are still required).
+
+```sh
+maw-go herdr serve --help
+# Use an existing private token file; serving requires authentication.
+maw-go herdr serve --token-file "$HOME/.maw-herdr-token" --listen 127.0.0.1:3457
+```
+
+GitHub **source** archives also install without Git, but do not contain native
+prebuilt helpers:
+
+```sh
+maw-go plugin install https://github.com/Soul-Brews-Studio/maw-herdr-plugin/archive/6318e0f7c56d9272656c804d990de35ab50557d6.tar.gz
+```
+
+Archive installs stay non-Git: replace them with a newer archive, not `plugin update`.
+Manifest SHA-256 checks detect inconsistent package files, not publisher identity;
+install only trusted archives. No scripts, builds or server startup run on install.
+
+#### Git installations (all four ports)
+
 Basic Git management lives in maw-cli, not the plugins. Requires Git; no builds
 or plugin scripts run during installation. The marketplace is just a small list.
 
