@@ -125,8 +125,12 @@ with tempfile.TemporaryDirectory(prefix="maw-update-") as temporary:
         passed = 0
 
         def reset(binary="old"):
-            executable.write_bytes(binaries[binary])
-            executable.chmod(0o755)
+            # A fresh inode avoids macOS retaining signing/cache state from a
+            # previously executed binary when the next scenario changes bytes.
+            fresh = install / "reset-candidate"
+            fresh.write_bytes(binaries[binary])
+            fresh.chmod(0o755)
+            fresh.replace(executable)
             requests.clear()
 
         def run(*args, success=True, through_alias=False):

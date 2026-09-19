@@ -50,11 +50,17 @@ with tempfile.TemporaryDirectory(prefix="maw-marketplace-") as temporary:
             assert warning in result.stderr, result.stderr
         else:
             assert not result.stderr, result.stderr
-        assert snapshot() == before, "marketplace modified fixture files"
+        after = snapshot()
+        changes = {path: {"before": before.get(path), "after": after.get(path)}
+                   for path in sorted(before.keys() | after.keys())
+                   if before.get(path) != after.get(path)}
+        assert not changes, f"marketplace fixture changed: {json.dumps(changes, indent=2)}"
 
     def g(*args, cwd=None):
         result = subprocess.run([git, "-c", "core.hooksPath=/dev/null", "-c", "user.name=Smoke",
-                                 "-c", "user.email=smoke@example.invalid", *args],
+                                 "-c", "user.email=smoke@example.invalid",
+                                 # Keep fixture setup from spawning writers after it returns.
+                                 "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args],
                                 cwd=cwd or plugin, env=env, text=True, capture_output=True, timeout=15)
         assert result.returncode == 0, result.stderr
         return result.stdout.strip()
