@@ -5,3 +5,8 @@ export type Command = {
   path?: string;
   run: (args: string[]) => number | Promise<number>;
 };
+
+export type InstalledPlugin = {
+  name: string; version: string; tier: "core" | "standard" | "extra";
+  dir: string; enabled: boolean; cli: boolean; api: boolean; missing: boolean;
+};

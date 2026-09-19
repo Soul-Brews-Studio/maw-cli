@@ -41,7 +41,9 @@ The public executables are `maw-go`, `maw-rs`, `maw-js`, and `maw-zig`.
 The common help/diagnostic prefix stays `maw`, and plugins keep the `maw-` prefix;
 the four host names are reserved, not recursively discovered as plugins.
 JavaScript uses one named function per `mod.<function>.ts`; `mod.run` assembles
-the registry; `mod.listPlugins` serves `plugin ls` and its plural aliases.
+the command registry; `mod.listPlugins` serves `plugin ls` and its plural aliases
+through separate static inventory path/config/JSON/format helpers. Go, Rust and
+Zig independently implement the same [global inventory contract](installed-plugin-listing.md).
 Root `package.json` exposes the Bun entrypoint as `maw-js` for direct GitHub bunx.
 Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark

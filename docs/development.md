@@ -21,7 +21,10 @@ verify help/list side effects, argv, streams and normal exit status. See the
 [plugin contract](plugins.md) for trust and signal-forwarding limits.
 JavaScript named helpers use `src/js/src/mod.<function>.ts`, one function per file;
 `cli.ts` is the executable entrypoint. Root `package.json` exposes it to GitHub bunx.
-The CLI ports have no third-party runtime dependencies.
+Rust uses the user-approved `serde_json` for installed-plugin metadata; the
+other ports use their standard JSON parsers. The Rust lockfile keeps `ryu` at
+1.0.20 for Rust 1.69 compatibility. Shared smoke includes a temporary global
+plugin/config fixture and proves listing does not load code or write state.
 
 ## Measure
 

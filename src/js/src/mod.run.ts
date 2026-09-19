@@ -16,12 +16,12 @@ export async function run(args: string[]): Promise<number> {
     run: showVersion,
   });
   registry.set("plugin", {
-    name: "plugin", summary: "List commands and executable plugin paths", usage: "maw plugin ls",
-    run: (args) => listPlugins(registry, args),
+    name: "plugin", summary: "List installed plugin metadata", usage: "maw plugin ls [-v|--verbose] [--all]",
+    run: (args) => listPlugins(args),
   });
   registry.set("plugins", {
-    name: "plugins", summary: "Alias for plugin ls", usage: "maw plugins [ls]",
-    run: (args) => listPlugins(registry, args, true),
+    name: "plugins", summary: "Alias for plugin ls", usage: "maw plugins [ls] [-v|--verbose] [--all]",
+    run: (args) => listPlugins(args, true),
   });
   for (const [name, path] of discover()) {
     if (registry.has(name)) continue;

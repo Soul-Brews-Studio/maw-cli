@@ -138,15 +138,28 @@ run in the background after successful alpha CI.
 
 ## Commands
 
-List commands and available executable plugins without running them:
+List installed plugins from `~/.maw/plugins` without loading or running them:
 
 ```sh
 bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin ls
 ```
 
-`plugins ls` and the original `plugins` are equivalent aliases. The table shows
-command names, builtin/external type, and resolved executable paths. No plugin
-installation or management is included.
+`plugins ls` and the original `plugins` are equivalent aliases. Default output
+shows active/disabled totals, tiers, CLI/API metadata, entry-file health and names.
+Add `-v` for `name`, `version`, `tier`, `enabled|disabled`, and directory rows;
+add `--all` to include disabled plugins.
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugins ls -v
+```
+
+This is a **read-only JSON inventory**, not the old maw runtime loader. It reads
+`plugin.json` only; TypeScript-only manifests are reported and skipped. Global
+path/config overrides are supported; project overlays, active profiles and
+runtime compatibility/hash validation are not. `health: ok` checks file existence,
+not whether plugins are safe or runnable. See the [inventory contract](docs/installed-plugin-listing.md).
+Built-ins and PATH commands remain visible in `help`. No installation or state
+changes are included.
 
 All ports provide `help`, `version`, `plugin ls`, and external `maw <plugin> [args...]`.
 The former benchmark-only `index` command has been removed. Go also provides

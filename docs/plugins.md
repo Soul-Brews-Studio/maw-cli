@@ -7,11 +7,21 @@
 | `maw`, `maw -h`, `maw --help`, `maw help` | List registered commands |
 | `maw help <command>` | Show built-in usage or invoke an external plugin with `--help` |
 | `maw version`, `maw -v`, `maw --version` | Print the host version |
-| `maw plugin ls` | List public command names, built-in/external kind, and executable path |
+| `maw plugin ls` | Summarize installed global plugin JSON metadata |
+| `maw plugin ls -v` | Show name/version/tier/enabled-state/directory rows |
+| `maw plugin ls --all` | Include disabled plugins |
 | `maw plugins`, `maw plugins ls` | Compatibility aliases for `maw plugin ls` |
 | `maw <external> [args...]` | Run a discovered `maw-<external>` executable |
 
-## Discovery and trust
+## Installed metadata versus executable commands
+
+Listing reads the global plugin inventory, normally `~/.maw/plugins`, using
+`plugin.json` and global disabled-plugin configuration. It does not list the
+host's built-ins or PATH command catalog. See [inventory rules and limits](installed-plugin-listing.md)
+for path overrides, config precedence, TypeScript-only manifests and health.
+All aliases have the same behavior. No plugin/config state is changed.
+
+## PATH command discovery and trust
 
 - Names match `[a-z][a-z0-9-]*`. Matching is exact and case-sensitive.
 - Only absolute PATH directories are searched. Empty/relative entries are ignored,
@@ -24,7 +34,7 @@
   are skipped. Root help and listing do not execute discovered code.
 - PATH is a trust boundary. A file can change between discovery and execution;
   plugins are normal programs running as you, not signed or sandboxed packages.
-- `maw plugin ls` displays the selected resolved paths. It does not download,
+- `maw plugin ls` is a separate metadata inventory. It does not download,
   install, update, activate, or uninstall software.
 
 ## Invocation
@@ -76,7 +86,7 @@ are maw-cli design decisions, not upstream behavior claims.
 Only host-essential commands should be built in. Register a `CommandPlugin` factory in its package `init`, then blank-import
 the package from `src/go/internal/commands/register.go`.
 Smoke-call it now; unit tests wait for the user's explicit mark.
-It automatically participates in help/listing; no separate help catalog to edit.
+It automatically participates in help/dispatch; no separate help catalog to edit.
 Prefer an external plugin for operational commands so the host stays lean.
 
 ## Go built-in modules

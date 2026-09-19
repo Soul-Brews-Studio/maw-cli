@@ -15,12 +15,13 @@ with tempfile.TemporaryDirectory(prefix="maw-package-") as temporary:
     package.mkdir()
     shutil.copy2(ROOT / "package.json", package / "package.json")
     shutil.copytree(ROOT / "src/js/src", package / "src/js/src")
-    env = dict(os.environ, BUN_INSTALL_CACHE_DIR=str(work / "cache"), TMPDIR=str(work / "tmp"))
+    env = dict(os.environ, BUN_INSTALL_CACHE_DIR=str(work / "cache"), TMPDIR=str(work / "tmp"),
+               MAW_HOME=str(work / "home"), MAW_PLUGINS_DIR=str(work / "home/plugins"))
     (work / "tmp").mkdir()
     command = ["bun", "x", "--bun", "--package", str(package), "maw-js"]
     for args, expected in ((["--help"], "Usage: maw"), (["version"], "maw dev"),
-                           (["plugin", "ls"], "NAME\tTYPE\tPATH"), (["plugins", "ls"], "NAME\tTYPE\tPATH"),
-                           (["plugins"], "NAME\tTYPE\tPATH")):
+                           (["plugin", "ls"], "no plugins installed"), (["plugins", "ls"], "no plugins installed"),
+                           (["plugins"], "no plugins installed")):
         result = subprocess.run(command + args, cwd=work, env=env, text=True, capture_output=True, check=True)
         if expected not in result.stdout:
             raise SystemExit(f"unexpected package output: {result.stdout!r}")
