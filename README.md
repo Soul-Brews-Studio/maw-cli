@@ -162,7 +162,8 @@ List installed plugins from `~/.maw/plugins` without loading or running them:
 bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin ls
 ```
 
-`plugins ls` and the original `plugins` are equivalent aliases. Default output
+Help shows only `plugin`; `plugins ls` and the original `plugins` still work as
+compatibility aliases. Default output
 shows active/disabled totals, tiers, CLI/API metadata, entry-file health and names.
 Add `-v` for `name`, `version`, `tier`, `enabled|disabled`, and directory rows;
 add `--all` to include disabled plugins.

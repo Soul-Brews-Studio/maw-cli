@@ -72,7 +72,9 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   as the small executable entrypoint and shared declarations in `types.ts`.
 
 - The public listing command is `plugin ls`; accept `plugins ls` and legacy
-  `plugins` plus `list` as equivalent aliases. They inventory global installed `plugin.json`
+  `plugins` plus `list` as equivalent aliases. Root help shows only `plugin`;
+  preserve the plural alias registration, explicit help and collision protection.
+  They inventory global installed `plugin.json`
   metadata (not built-ins or PATH commands); `-v`/`--verbose` shows rows and
   `--all` includes disabled entries. Follow docs/installed-plugin-listing.md.
   Never execute `plugin.ts`, load entrypoints, migrate config or modify plugin

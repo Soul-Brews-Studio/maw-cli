@@ -47,7 +47,15 @@ run() {
 run > "$tmp/default"
 run --help > "$tmp/help"
 cmp "$tmp/default" "$tmp/help"
+for argument in help -h; do
+    run "$argument" > "$tmp/root-help"
+    cmp "$tmp/help" "$tmp/root-help"
+done
 grep -q 'Usage: maw' "$tmp/help"
+[ "$(grep -c '^  plugin[[:space:]]' "$tmp/help")" -eq 1 ] || fail 'root help must show one canonical plugin command'
+if grep -q '^  plugins[[:space:]]' "$tmp/help"; then
+    fail 'root help shows the compatibility plugins alias'
+fi
 grep -q 'probe' "$tmp/help"
 run version > "$tmp/version"
 grep -q '^maw .' "$tmp/version"
@@ -62,7 +70,6 @@ cmp "$tmp/plugin-ls" "$tmp/plugin-list"
 run marketplace > "$tmp/marketplace"
 grep -q 'Soul-Brews-Studio/maw-herdr-plugin' "$tmp/marketplace"
 [ ! -e "$tmp/home" ] || fail 'listing created plugin/config directories'
-grep -q '^  plugin[[:space:]]' "$tmp/help"
 if grep -q '^  index[[:space:]]' "$tmp/help" || grep -q '^index[[:space:]]' "$tmp/plugin-ls"; then
     fail 'removed index command leaked into help/listing'
 fi
@@ -78,6 +85,10 @@ run plugin --help > "$tmp/list-help"
 run help plugin > "$tmp/list-help-alias"
 cmp "$tmp/list-help" "$tmp/list-help-alias"
 grep -q 'Usage: maw plugin ' "$tmp/list-help"
+run plugins --help > "$tmp/plural-help"
+run help plugins > "$tmp/plural-help-alias"
+cmp "$tmp/plural-help" "$tmp/plural-help-alias"
+grep -q 'Usage: maw plugins' "$tmp/plural-help"
 for name in plugin plugins; do
     for argument in install update info check LS; do
         status=0
