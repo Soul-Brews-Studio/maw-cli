@@ -158,8 +158,44 @@ This is a **read-only JSON inventory**, not the old maw runtime loader. It reads
 path/config overrides are supported; project overlays, active profiles and
 runtime compatibility/hash validation are not. `health: ok` checks file existence,
 not whether plugins are safe or runnable. See the [inventory contract](docs/installed-plugin-listing.md).
-Built-ins and PATH commands remain visible in `help`. No installation or state
-changes are included.
+Built-ins and PATH commands remain visible in `help`. Listing never installs or
+changes plugin state.
+
+### Install, update, and check
+
+Basic Git management lives in maw-cli, not the plugins. Requires Git; no builds
+or plugin scripts run during installation. The marketplace is just a small list.
+
+```sh
+maw-go marketplace
+maw-go plugin install herdr
+maw-go plugin list
+maw-go plugin update herdr
+maw-go plugin info herdr
+maw-go plugin check herdr
+```
+
+Use `maw-rs`, `maw-js`, or `maw-zig` for the same commands. From GitHub:
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin install herdr
+```
+
+To pin a **new installation** to the merged Herdr serve commit instead:
+
+```sh
+maw-go plugin install Soul-Brews-Studio/maw-herdr-plugin --ref 6318e0f7c56d9272656c804d990de35ab50557d6
+# Existing installation: maw-go plugin update herdr --ref FULL_COMMIT_SHA
+```
+
+Default-branch installs update by fast-forward; explicit refs stay pinned until
+you supply a new `--ref`. Local changes and existing install destinations are
+never overwritten. `info` shows the commit and actual entry **Git blob hash**;
+`check` compares bytes to Git HEAD. This is not a publisher signature or package
+SHA-256 verification. [Small lifecycle contract](docs/plugin-lifecycle.md).
+
+Herdr Git installs keep its Go source, **not a prebuilt server**. Serving requires
+its separate native package or explicit `serve --build` with Go installed.
 
 ### Run an installed CLI plugin
 
@@ -178,12 +214,12 @@ Built-ins win first, then `maw-<command>` on PATH, then installed CLI metadata.
 The plugin runs as a child with your terminal, arguments, environment and working
 directory; **this is not a sandbox**. Native hosts also need `bun` to run these
 JS plugins. Herdr operations additionally need the `herdr` binary on PATH.
-Handler-module/WASM plugins and plugin installation are not implemented.
+Handler-module/WASM execution is not implemented.
 See [dispatch rules](docs/plugins.md#installed-standalone-bun-clis).
 If `#alpha` serves an old cached CLI, use the [fresh-fetch recipe](#run-maw)
 or pin a commit containing installed-plugin dispatch.
 
-All ports provide `help`, `version`, `plugin ls`, and external `maw <plugin> [args...]`.
+All ports provide `help`, `version`, `marketplace`, plugin management, and external `maw <plugin> [args...]`.
 The former benchmark-only `index` command has been removed. Go also provides
 [`context`](docs/mcp.md) through local Serena and CodeGraph MCP servers. Plugins
 run with your privileges, not in a sandbox.

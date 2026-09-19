@@ -117,7 +117,7 @@ fn absolute(path: PathBuf) -> Result<PathBuf> {
     }
     Ok(normalized)
 }
-fn paths() -> Result<(PathBuf, PathBuf)> {
+pub(crate) fn paths() -> Result<(PathBuf, PathBuf)> {
     let home = env("HOME")
         .or_else(|| env("USERPROFILE"))
         .unwrap_or_default();
@@ -393,7 +393,7 @@ pub fn run(args: &[OsString], legacy: bool) -> i32 {
         "maw: usage: maw {} [-v|--verbose] [--all]",
         if legacy { "plugins [ls]" } else { "plugin ls" }
     );
-    let flags = if args.first().map_or(false, |s| s == "ls") {
+    let flags = if args.first().map_or(false, |s| s == "ls" || s == "list") {
         &args[1..]
     } else if legacy {
         args

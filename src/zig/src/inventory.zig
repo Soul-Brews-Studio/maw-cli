@@ -238,7 +238,7 @@ pub fn run(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ.Map
     const c = Context{ .a = a, .io = io, .env = env };
     var flags = args;
     var valid = true;
-    if (args.len > 0 and eql(args[0], "ls")) {
+    if (args.len > 0 and (eql(args[0], "ls") or eql(args[0], "list"))) {
         flags = args[1..];
     } else if (!legacy) {
         valid = false;
@@ -330,4 +330,8 @@ fn findBun(c: Context) !?[]const u8 {
         return path;
     }
     return null;
+}
+
+pub fn pluginRoot(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ.Map) ![]const u8 {
+    return (try (Context{ .a = a, .io = io, .env = env }).paths()).plugins;
 }

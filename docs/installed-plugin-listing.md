@@ -7,7 +7,7 @@ the existing help/dispatch/inertness smoke. No unit framework or plugin executio
 
 ## Shared contract
 
-- `plugin ls`, `plugins ls`, and legacy `plugins` list the same inventory.
+- `plugin ls`, `plugin list`, `plugins ls/list`, and legacy `plugins` list the same inventory.
   Accept `-v`/`--verbose` and `--all` after `ls` (or after bare `plugins`).
   Unknown flags/arguments fail with usage, exit 2. No management operations.
 - Read one global plugin directory: nonempty `MAW_PLUGINS_DIR`, otherwise
@@ -77,7 +77,9 @@ roots, active profiles, config migrations, SDK compatibility gates, artifact
 hash verification, or executable TypeScript manifests. `health: ok` means only
 that declared entry files exist, not that plugins are safe or runnable.
 Built-ins/PATH commands remain visible through `help`; their execution protocol
-is unchanged. No install/update/enable/disable operations and no `index` command.
+is unchanged. Listing has no install/update/enable/disable effects and no `index`
+command. Explicit [Git lifecycle commands](plugin-lifecycle.md) are separate;
+their entry-byte check does not change what listing's file-health column means.
 Rust may reuse `serde_json` for this metadata only, explicitly approved by the user.
 
 Regular-file checks and bounded reads are not a filesystem sandbox: concurrent

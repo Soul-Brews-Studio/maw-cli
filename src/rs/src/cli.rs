@@ -56,9 +56,14 @@ pub fn run(args: Vec<OsString>) -> i32 {
         ("help", "Show command help", "maw help [command]"),
         ("version", "Show maw version", "maw version"),
         (
+            "marketplace",
+            "List known plugin sources",
+            "maw marketplace [ls|list]",
+        ),
+        (
             "plugin",
-            "List installed plugin metadata",
-            "maw plugin ls [-v|--verbose] [--all]",
+            "Manage installed plugins",
+            "maw plugin ls|list|install|update|info|check [args]",
         ),
         (
             "plugins",
@@ -110,7 +115,13 @@ pub fn run(args: Vec<OsString>) -> i32 {
         return help(&registry, &args[1..]);
     }
     if name == "plugin" || name == "plugins" {
+        if let Some(code) = crate::lifecycle::run(&args[1..]) {
+            return code;
+        }
         return crate::inventory::run(&args[1..], name == "plugins");
+    }
+    if name == "marketplace" {
+        return crate::lifecycle::marketplace(&args[1..]);
     }
     if args.len() != 1 {
         return fail(&format!("usage: {}", command.usage));

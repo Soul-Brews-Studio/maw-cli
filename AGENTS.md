@@ -72,12 +72,20 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   as the small executable entrypoint and shared declarations in `types.ts`.
 
 - The public listing command is `plugin ls`; accept `plugins ls` and legacy
-  `plugins` as equivalent aliases. They inventory global installed `plugin.json`
+  `plugins` plus `list` as equivalent aliases. They inventory global installed `plugin.json`
   metadata (not built-ins or PATH commands); `-v`/`--verbose` shows rows and
   `--all` includes disabled entries. Follow docs/installed-plugin-listing.md.
   Never execute `plugin.ts`, load entrypoints, migrate config or modify plugin
   state while listing. PATH dispatch remains separate with builtin collision
   protection; do not add plugin management operations implicitly.
+- Basic Git lifecycle belongs to maw-cli, not individual plugins: `marketplace`
+  is a static source list; explicit `plugin install/update/info/check` use Git's
+  origin/HEAD rather than new registry/lock machinery. Follow
+  docs/plugin-lifecycle.md. No automatic builds, hooks, background updates or
+  native downloads. Preserve pins, refuse dirty/non-fast-forward updates, and
+  validate candidate metadata before mutation. Label the entry Git blob hash
+  honestly; it is not a SHA-256 package checksum or publisher signature. Keep all
+  ports covered by utils/scripts/lifecycle-smoke.py; no new unit framework.
 - Installed command dispatch is a separate, explicit subprocess operation after
   builtin/PATH lookup. Reuse inventory selection and disabled state. Only standalone
   Bun scripts declaring `runtime=bun-dev`, `target=js`, `cli.interactive=true` are

@@ -115,7 +115,7 @@ plugin with help, validation, tests, and an explicit effect boundary.
 | `work`, `worktree` | Repository/issue workspaces | Git/worktree writes |
 | `serve` | API/WebSocket backend | Long-running listener; outside the help host |
 | `config`, `doctor` | Configuration editing and diagnostics | Reads by default; writes explicit |
-| `plugin install` / managed verification | Future extension beyond read-only listing | Requires a separate trust and distribution design |
+| `plugin install/update/info/check` | Basic host-owned Git lifecycle | Explicit clone/update; commit and Git-blob inspection; see [contract](plugin-lifecycle.md) |
 
 Catalog evidence: [maw-js core route names](https://github.com/Soul-Brews-Studio/maw-js/blob/5ee396a7f61def2ee2a8774d3f6da216e069c6c2/src/cli/dispatch.ts#L9-L15),
 [maw-rs usage examples](https://github.com/Soul-Brews-Studio/maw-rs/blob/76f130846207ec7b631a70e3b18ac25b99966b92/README.md#usage),
