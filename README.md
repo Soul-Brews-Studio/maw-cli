@@ -6,7 +6,7 @@ Modular built-ins and external executable plugins; no tmux service or agent engi
 ## Run maw
 
 Choose one implementation. Go adds the `context` MCP command; the four ports
-otherwise share the help/plugin/index contract.
+otherwise share the help/version/plugin contract.
 
 ### Prebuilt: no compiler or runtime
 
@@ -46,6 +46,19 @@ Use `#alpha`, not the browser URL `/tree/alpha`. Replace the fragment with an ex
 commit or published release tag to pin the source. This downloads the Git package,
 not a prebuilt binary or npm package. See [bunx](https://bun.com/docs/pm/bunx) and
 [Bun Git dependencies](https://bun.com/docs/pm/cli/add#git-dependencies).
+
+Bun may reuse a cached `#alpha` checkout. To fetch current alpha without clearing
+other packages, use a fresh temporary cache (verified with Bun 1.3.11):
+
+```sh
+(
+  fresh=$(mktemp -d) || exit
+  trap 'rm -rf "$fresh"' EXIT
+  TMPDIR="$fresh" bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin ls
+)
+```
+
+This bypasses bunx's [temporary executable cache](https://github.com/oven-sh/bun/blob/a04817ce2b7f1a1e8b7cbf8af8f2c027ab072f1d/src/cli/bunx_command.zig#L474-L534).
 
 With npm/npx instead of an existing Bun install:
 
