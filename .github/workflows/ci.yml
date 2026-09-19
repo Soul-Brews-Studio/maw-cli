@@ -34,6 +34,7 @@ jobs:
       - name: Compile and smoke (no unit tests or artifact uploads)
         env:
           MAW_LANGUAGE: ${{ matrix.language }}
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
         run: |
           case "$MAW_LANGUAGE" in
             go)

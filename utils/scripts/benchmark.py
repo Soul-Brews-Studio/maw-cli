@@ -56,6 +56,7 @@ def commands(language, scratch=None):
         if scratch:
             env["GOCACHE"] = str(scratch / "cache")
     elif language == "rs":
+        env.setdefault("CARGO_REGISTRIES_CRATES_IO_PROTOCOL", "sparse")
         target = scratch / "target" if scratch else ROOT / "src/rs/target"
         build = [tool("cargo"), "build", "--locked", "--release", "--manifest-path", str(ROOT / "src/rs/Cargo.toml")]
         env["CARGO_TARGET_DIR"] = str(target)

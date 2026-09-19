@@ -19,7 +19,7 @@ def check(condition, message):
 
 
 with tempfile.TemporaryDirectory(prefix="maw-mcp-smoke-") as temporary:
-    project = Path(temporary)
+    project = Path(temporary).resolve()
     (project / "fixture.go").write_text("package fixture\nfunc Fixture() {}\n")
     config = project / "mcp.json"
 
