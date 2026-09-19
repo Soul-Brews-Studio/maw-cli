@@ -125,9 +125,20 @@ run in the background after successful alpha CI.
 
 ## Commands
 
-All ports provide `help`, `version`, `plugins`, `index FILE|-`, and external
-`maw <plugin> [args...]`. Go also provides [`context`](docs/mcp.md) through local
-Serena and CodeGraph MCP servers. Plugins run with your privileges, not in a sandbox.
+List commands and available executable plugins without running them:
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin ls
+```
+
+`plugins ls` and the original `plugins` are equivalent aliases. The table shows
+command names, builtin/external type, and resolved executable paths. No plugin
+installation or management is included.
+
+All ports provide `help`, `version`, `plugin ls`, and external `maw <plugin> [args...]`.
+The former benchmark-only `index` command has been removed. Go also provides
+[`context`](docs/mcp.md) through local Serena and CodeGraph MCP servers. Plugins
+run with your privileges, not in a sandbox.
 
 ## Repository
 

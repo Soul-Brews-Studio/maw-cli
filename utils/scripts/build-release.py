@@ -75,7 +75,7 @@ def main():
             run(["zig", "build", "--build-file", "src/zig/build.zig", "-Doptimize=ReleaseFast", "-Dversion=" + args.version,
                  "--cache-dir", str(work / "zig-cache"), "--prefix", str(work / "zig-out")], env=env)
             binary = work / "zig-out/bin/maw-zig"
-        # No ambient operational maw plugins should run during version or index smoke.
+        # No ambient operational maw plugins should run during the version check.
         empty_path = work / "empty-path"
         empty_path.mkdir()
         smoke_env = dict(env, PATH=str(empty_path))
@@ -83,7 +83,6 @@ def main():
         if actual != f"maw {args.version}\n":
             raise SystemExit(f"unexpected binary version: {actual!r}")
         run(["sh", "utils/scripts/smoke.sh", str(binary)], env=env)
-        run([sys.executable, str(ROOT / "utils/scripts/index-smoke.py"), "--", str(binary)], env=smoke_env)
         if args.language == "go":
             run([sys.executable, "utils/scripts/mcp-smoke.py", str(binary)], env=env)
         payload = binary.read_bytes()

@@ -24,8 +24,8 @@ printf 'probe stderr\n' >&2
 exit 7
 PLUGIN
 chmod +x "$tmp/plugins/maw-probe"
-# Host binaries share the maw-* prefix but must never become plugins.
-for host in go rs js zig; do
+# Host binaries must be excluded; both listing built-ins must win PATH collisions.
+for host in go rs js zig plugin plugins; do
     cat > "$tmp/plugins/maw-$host" <<'HOST'
 #!/bin/sh
 printf 'host ran\n' >> "$MAW_SMOKE_MARKER"
@@ -53,6 +53,43 @@ run version > "$tmp/version"
 grep -q '^maw .' "$tmp/version"
 run plugins > "$tmp/plugins-list"
 grep -q 'probe.*external' "$tmp/plugins-list"
+run plugin ls > "$tmp/plugin-ls"
+run plugins ls > "$tmp/plugins-ls"
+cmp "$tmp/plugins-list" "$tmp/plugin-ls"
+cmp "$tmp/plugins-list" "$tmp/plugins-ls"
+grep -q '^plugin[[:space:]].*builtin' "$tmp/plugin-ls"
+grep -q '^plugins[[:space:]].*builtin' "$tmp/plugin-ls"
+grep -q '^  plugin[[:space:]]' "$tmp/help"
+if grep -q '^  index[[:space:]]' "$tmp/help" || grep -q '^index[[:space:]]' "$tmp/plugin-ls"; then
+    fail 'removed index command leaked into help/listing'
+fi
+status=0
+printf '' | run index - > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 2 ] || fail "removed index command exit: $status"
+grep -q 'unknown command' "$tmp/err"
+status=0
+run help index > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 2 ] || fail "removed index help exit: $status"
+grep -q 'unknown command' "$tmp/err"
+run plugin --help > "$tmp/list-help"
+run help plugin > "$tmp/list-help-alias"
+cmp "$tmp/list-help" "$tmp/list-help-alias"
+grep -q 'Usage: maw plugin ls' "$tmp/list-help"
+for name in plugin plugins; do
+    for argument in install list LS; do
+        status=0
+        run "$name" "$argument" > "$tmp/out" 2> "$tmp/err" || status=$?
+        [ "$status" -eq 2 ] || fail "unsupported plugin operation: $name $argument: $status"
+        grep -q 'usage: maw' "$tmp/err"
+    done
+    status=0
+    run "$name" ls extra > "$tmp/out" 2> "$tmp/err" || status=$?
+    [ "$status" -eq 2 ] || fail "extra plugin arguments: $name: $status"
+done
+status=0
+run plugin > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 2 ] || fail "missing plugin subcommand: $status"
+grep -q 'usage: maw plugin ls' "$tmp/err"
 for host in go rs js zig; do
     if grep -q "^$host[[:space:]]" "$tmp/plugins-list"; then
         fail "host binary discovered as plugin: $host"
@@ -83,4 +120,4 @@ printf 'hello stdin\n' | run probe 'two words' '' '*.go' > "$tmp/out" 2> "$tmp/e
 [ "$status" -eq 7 ] || fail "plugin exit/argv: $status"
 grep -q '^stdin=hello stdin$' "$tmp/out"
 grep -q '^probe stderr$' "$tmp/err"
-printf 'smoke: help, version, discovery, plugin argv/streams/exit OK\n'
+printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin argv/streams/exit OK\n'

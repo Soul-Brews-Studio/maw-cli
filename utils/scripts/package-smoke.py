@@ -18,11 +18,17 @@ with tempfile.TemporaryDirectory(prefix="maw-package-") as temporary:
     env = dict(os.environ, BUN_INSTALL_CACHE_DIR=str(work / "cache"), BUN_TMPDIR=str(work / "tmp"))
     (work / "tmp").mkdir()
     command = ["bun", "x", "--bun", "--package", str(package), "maw-js"]
-    for args, expected in ((["--help"], "Usage: maw"), (["version"], "maw dev")):
+    for args, expected in ((["--help"], "Usage: maw"), (["version"], "maw dev"),
+                           (["plugin", "ls"], "NAME\tTYPE\tPATH"), (["plugins", "ls"], "NAME\tTYPE\tPATH"),
+                           (["plugins"], "NAME\tTYPE\tPATH")):
         result = subprocess.run(command + args, cwd=work, env=env, text=True, capture_output=True, check=True)
         if expected not in result.stdout:
             raise SystemExit(f"unexpected package output: {result.stdout!r}")
+    result = subprocess.run(command + ["index", "-"], cwd=work, env=env,
+                            text=True, input="", capture_output=True)
+    if result.returncode != 2 or 'unknown command "index"' not in result.stderr:
+        raise SystemExit(f"removed index command still available: {result}")
     metadata = json.loads((package / "package.json").read_text())
     if metadata.get("dependencies") or metadata.get("scripts"):
         raise SystemExit("Git package must not need dependencies or install/build hooks")
-    print("PASS: isolated bunx package help/version, no clone/build hooks required")
+    print("PASS: isolated bunx package help/version/plugin ls aliases, no clone/build hooks required")

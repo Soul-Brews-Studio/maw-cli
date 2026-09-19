@@ -53,15 +53,11 @@ pub fn run(args: Vec<OsString>) -> i32 {
         ("help", "Show command help", "maw help [command]"),
         ("version", "Show maw version", "maw version"),
         (
-            "index",
-            "Index normalized MCP JSONL context",
-            "maw index FILE|-",
-        ),
-        (
-            "plugins",
+            "plugin",
             "List commands and executable plugin paths",
-            "maw plugins",
+            "maw plugin ls",
         ),
+        ("plugins", "Alias for plugin ls", "maw plugins [ls]"),
     ] {
         registry.insert(
             name.to_owned(),
@@ -104,10 +100,12 @@ pub fn run(args: Vec<OsString>) -> i32 {
     if name == "help" {
         return help(&registry, &args[1..]);
     }
-    if name == "index" {
-        return crate::index::run(&args[1..]);
-    }
-    if args.len() != 1 {
+    let valid_args = if name == "plugin" || name == "plugins" {
+        (args.len() == 2 && args[1] == "ls") || (name == "plugins" && args.len() == 1)
+    } else {
+        args.len() == 1
+    };
+    if !valid_args {
         return fail(&format!("usage: {}", command.usage));
     }
     if name == "version" {
