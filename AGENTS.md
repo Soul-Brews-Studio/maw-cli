@@ -46,6 +46,14 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 - The installed `$calver` skill targets arra; reuse its pinned pure calculator,
   never its mutating main entrypoint or a new Go version engine. `just go release`
   stays read-only preview; trusted Actions publication is separately automated.
+- Alpha release tags use exactly `vYY.M.D-alpha.HMM`, with no run-ID suffix.
+  Calculate the date and `HMM = hour * 100 + minute` in `Asia/Bangkok` from the
+  source CI run's creation time; omit leading zeros (09:37 becomes `937`).
+  The Go companion tag is `src/go/v0.YYYYMMDD.HMM-alpha`, at the same source SHA.
+  Keep the CI run ID in provenance metadata only. Rerunning the same CI run keeps
+  its original timestamp and tags. Refuse collisions with a different source SHA;
+  never move existing tags. A new timestamp requires a genuinely new source CI
+  run created in a later minute, not a rerun of the original run.
 - Use `relic` CLI incrementally to retain long-session context. Read only relevant
   history and keep raw transcripts/index databases local. Active sessions may
   remain changed immediately after indexing; do not loop trying to reach zero.

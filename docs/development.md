@@ -1,6 +1,6 @@
 # Development
 
-Start with the [run guide](running.md) if you only want to use the CLI.
+Start with the [run guide](../README.md#run-maw) if you only want to use the CLI.
 The ports are independent implementations, not vendored maw-js/maw-rs projects.
 
 ## Build and smoke

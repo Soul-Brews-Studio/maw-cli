@@ -38,16 +38,21 @@ provides the Bangkok calendar date and integer hour*100+minute. The source is
 SHA256-verified before import; its mutating main entrypoint is never executed.
 No Go version calculator or runtime dependency is added.
 
-The successful source CI run's creation time and ID give deterministic selectors:
+The successful source CI run's creation time gives deterministic selectors in
+`Asia/Bangkok`:
 
-- Root release tag: `vYY.M.D-alpha.HMM.CI_RUN_ID`.
-- Nested Go tag: `src/go/v0.YYYYMMDD.HMM-alpha.CI_RUN_ID`.
-- Both point to the same full source SHA. The run suffix avoids minute collisions.
+- Root release tag: `vYY.M.D-alpha.HMM`.
+- Nested Go tag: `src/go/v0.YYYYMMDD.HMM-alpha`.
+- `HMM = hour * 100 + minute`, without leading zeros: September 19, 2026 at
+  09:37 becomes `v26.9.19-alpha.937` (format example, not a promised release).
+- Both point to the same full source SHA. The CI run ID stays in provenance
+  metadata, never in the version suffix.
 
 Use a published root tag after `#` in bunx. Use `go_version` from `release.json`
 after `@` in `go run/install .../src/go/cmd/maw-go`. The `v0` companion respects
 [Go nested-module rules](https://go.dev/ref/mod#vcs-version) without changing the
-module path. `alpha` remains the moving development branch.
+module path. `alpha` remains the moving development branch. Previously published
+run-qualified tags remain unchanged; this format applies to new releases.
 
 ## Trust, retries and failure
 
@@ -61,7 +66,10 @@ Assets upload to a draft, then publish only after all 18 match. A matching draft
 can resume; a matching complete release is a no-op. Existing tags and assets are
 never moved or clobbered. A rebuilt binary with different bytes is rejected,
 not silently substituted; retry the failed publish job with its original artifacts.
-If artifacts expired, rerun source CI to obtain a new run-qualified release.
+Rerunning the same source CI run retains its creation time and tags. A different
+source SHA in the same minute must not reuse an existing tag; publication refuses
+the collision. If artifacts expired or a collision needs a new timestamp, use a
+genuinely new source CI run created in a later minute, not GitHub's rerun action.
 
 If alpha advances, stale work skips instead of relabeling old binaries. A race may
 leave an unpublished draft or tags; inspect the run before recovery. Never force
@@ -78,5 +86,5 @@ just release publish /tmp/release-plan.json /path/to/release-assets
 ```
 
 These development helpers need Python 3, Bun, Git and authenticated `gh`.
-Preview never commits, tags, pushes or publishes. See the [run guide](running.md)
+Preview never commits, tags, pushes or publishes. See the [run guide](../README.md#run-maw)
 for download and source commands.
