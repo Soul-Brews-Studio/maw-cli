@@ -119,7 +119,7 @@ def main():
               "python": platform.python_version(), "samples": args.samples,
               "warmups": args.warmups, "languages": {},
               "method": "rotating round-robin, new process --help, stdout discarded; not OS-cold startup",
-              "limitations": ["time-to-prototype unmeasured", "throughput is measured separately by benchmark-index.py",
+              "limitations": ["time-to-prototype unmeasured", "throughput workload retired with the index command",
                               "source lines describe footprint, not productivity", "build caches isolated only with --builds; OS/toolchain caches remain warm"]}
     versions = {"go": [[tool("go"), "version"]] if "go" in languages else [],
                 "rs": [[tool("rustc"), "--version"], [tool("cargo"), "--version"]] if "rs" in languages else [],

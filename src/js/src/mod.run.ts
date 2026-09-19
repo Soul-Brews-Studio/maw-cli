@@ -1,6 +1,5 @@
 import { discover } from "./mod.discover";
 import { execute } from "./mod.execute";
-import { indexTrace } from "./mod.indexTrace";
 import { fail } from "./mod.fail";
 import { unknown } from "./mod.unknown";
 import { rootHelp } from "./mod.rootHelp";
@@ -12,16 +11,17 @@ import type { Command } from "./types";
 export async function run(args: string[]): Promise<number> {
   const registry = new Map<string, Command>();
   registry.set("help", { name: "help", summary: "Show command help", usage: "maw help [command]", run: (args) => help(registry, args) });
-  registry.set("index", {
-    name: "index", summary: "Index MCP-shaped JSONL context records", usage: "maw index FILE|-", run: indexTrace,
-  });
   registry.set("version", {
     name: "version", summary: "Show maw version", usage: "maw version",
     run: showVersion,
   });
-  registry.set("plugins", {
-    name: "plugins", summary: "List commands and executable plugin paths", usage: "maw plugins",
+  registry.set("plugin", {
+    name: "plugin", summary: "List commands and executable plugin paths", usage: "maw plugin ls",
     run: (args) => listPlugins(registry, args),
+  });
+  registry.set("plugins", {
+    name: "plugins", summary: "Alias for plugin ls", usage: "maw plugins [ls]",
+    run: (args) => listPlugins(registry, args, true),
   });
   for (const [name, path] of discover()) {
     if (registry.has(name)) continue;

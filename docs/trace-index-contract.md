@@ -1,5 +1,9 @@
 # MCP trace/context index workload — issue #6
 
+> Historical contract: the `index` CLI and its benchmark/smoke runners were
+> removed in the lean plugin-listing change. The behavior below describes older
+> source snapshots only; no hidden index command remains.
+
 `maw index FILE` (or `maw index -` for stdin) parses MCP-shaped JSONL and builds
 an in-memory inverted index. This is a real local processing command, not a live
 server throughput claim. Implementations share this input/output contract.

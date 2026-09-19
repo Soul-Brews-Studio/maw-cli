@@ -1,5 +1,4 @@
 mod cli;
-mod index;
 mod plugins;
 
 fn main() {

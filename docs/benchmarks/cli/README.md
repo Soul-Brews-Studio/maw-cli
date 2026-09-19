@@ -1,5 +1,11 @@
 # CLI measurements
 
+> Historical measurements below retain their original source snapshots. The
+> `index` command, parser implementations, and throughput runner were removed
+> in the lean plugin-listing change. Any index reproduction commands below
+> require checking out their recorded older source revision. Startup/build
+> measurement tasks remain available in the current checkout.
+
 Run from the checkout with Python 3 and the selected toolchains on PATH:
 
 ```sh

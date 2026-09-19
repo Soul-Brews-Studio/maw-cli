@@ -13,8 +13,9 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   isolated, and validate the same actual-process smoke fixture across ports.
 - `just dev all` builds/smokes all ports; `just <go|rs|js|zig> check` selects one.
   `just bench run` measures startup; `just bench builds` includes build samples.
-  `just bench index` measures normalized trace parsing, real postings and per-child
-  CPU/RSS. Keep development delivery windows distinct from exact first-build times. No synthetic numbers or language rankings.
+  Keep development delivery windows distinct from exact first-build times.
+  No synthetic numbers or language rankings. Historic index-throughput reports
+  refer to the removed command, not the current CLI.
 - After moves or branch switches, explicitly sync CodeGraph and verify a known
   symbol: `status` can say no changes even when transient checkout events removed
   symbols. Serena's live project config can also remain cached; persisted config
@@ -23,8 +24,8 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 - Start with a small, standard-library-only Go `maw` host. Commands share registry
   metadata for help and dispatch; new built-ins use `CommandPlugin` packages with init-time factory registration.
   External executable plugins keep their separate process boundary.
-- Rust alone may use the explicitly approved `serde_json`; preserve its pinned
-  Rust 1.69-compatible lockfile. No other direct dependencies without approval.
+- Preserve Rust 1.69 compatibility. The former `serde_json` dependency was
+  removed with the index parser. No new runtime dependencies without approval.
 - Compile first, then smoke-call the actual CLI. Unit tests are deferred until
   the user explicitly requests them. Do not add test frameworks. The user authorized automatic alpha prereleases and prebuilt uploads on 2026-09-19;
   publish only after verified same-repository alpha CI and complete native build smokes.
@@ -68,6 +69,13 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   four host executable names from plugin discovery to avoid recursive hosts.
 - JavaScript named helpers use one function per `mod.<function>.ts`; keep `cli.ts`
   as the small executable entrypoint and shared declarations in `types.ts`.
+
+- The public listing command is `plugin ls`; accept `plugins ls` and legacy
+  `plugins` as equivalent aliases. Listing is inert and protects built-in names
+  from PATH collisions. Do not add plugin management operations implicitly.
+- The `index` CLI was removed entirely at the user's request, not hidden. Do not
+  restore it, its parser dependencies, or its benchmark/smoke tasks implicitly.
+  Serena/CodeGraph indexing and Relic history indexing remain separate and active.
 
 ## Serena MCP: indexing and understanding
 

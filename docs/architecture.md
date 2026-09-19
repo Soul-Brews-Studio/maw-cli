@@ -41,7 +41,7 @@ The public executables are `maw-go`, `maw-rs`, `maw-js`, and `maw-zig`.
 The common help/diagnostic prefix stays `maw`, and plugins keep the `maw-` prefix;
 the four host names are reserved, not recursively discovered as plugins.
 JavaScript uses one named function per `mod.<function>.ts`; `mod.run` assembles
-the registry, `mod.indexTrace` calls `mod.validUnicode` and `mod.object`.
+the registry; `mod.listPlugins` serves `plugin ls` and its plural aliases.
 Root `package.json` exposes the Bun entrypoint as `maw-js` for direct GitHub bunx.
 Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark
@@ -79,8 +79,10 @@ Traces contain source identifiers, revision, hashes, timing and size, not raw qu
 or code content. Tool output is untrusted data. This is local application persistence,
 not server-only `notifications/message` or public telemetry. See [MCP](mcp.md).
 
-All four `index` implementations use the [same normalized workload](trace-index-contract.md).
-It is distinct from live semantic indexing and MCP transport. Production agent/fleet
+The experimental `index` CLI and all four parser implementations were removed
+to keep the host lean. Its [old workload contract](trace-index-contract.md) remains
+historical evidence only. Serena/CodeGraph context resolution and Relic history
+indexing are separate features and remain intact. Production agent/fleet
 operations remain outside this prototype.
 
 ## Non-goals for this increment

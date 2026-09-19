@@ -21,22 +21,23 @@ verify help/list side effects, argv, streams and normal exit status. See the
 [plugin contract](plugins.md) for trust and signal-forwarding limits.
 JavaScript named helpers use `src/js/src/mod.<function>.ts`, one function per file;
 `cli.ts` is the executable entrypoint. Root `package.json` exposes it to GitHub bunx.
-Rust alone uses the approved `serde_json`; the other ports use built-in JSON parsers.
+The CLI ports have no third-party runtime dependencies.
 
 ## Measure
 
 ```sh
 just bench run       # new-process startup samples
 just bench builds    # isolated-cache and repeated builds too
-just bench index     # normalized JSONL indexing: wall/CPU/peak RSS
 ```
 
 Build once, then smoke the compiled/bundled output. Raw benchmark JSON stays local.
 [Benchmark methodology and results](benchmarks/cli/README.md) distinguish native
 optimized builds from Bun bundles and warmed OS caches from cold-machine tests.
-The [index workload](trace-index-contract.md) measures local parsing and postings,
-not live MCP throughput. [Development evidence](development-benchmark.md) records
-observed delivery windows, not exact first-build times or language productivity rankings.
+The former `index` CLI, its smoke fixtures and throughput benchmark runner were
+removed. [Historical index results](benchmarks/cli/README.md) describe older source
+snapshots, not a command available in the current CLI.
+[Development evidence](development-benchmark.md) records observed delivery windows,
+not exact first-build times or language productivity rankings.
 
 ## MCP and learning
 
