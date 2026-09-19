@@ -6,3 +6,10 @@
 /dist/
 /.codegraph/
 __pycache__/
+
+# Per-language build caches/output
+/rs/target/
+/js/dist/
+/zig/.zig-cache/
+/zig/zig-out/
+/benchmarks/cli/results/

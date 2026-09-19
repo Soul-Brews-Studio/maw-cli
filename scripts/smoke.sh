@@ -1,12 +1,13 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-maw="$(pwd)/bin/maw"
+maw="${1:-$(pwd)/bin/maw-go}"
+entry="${2:-}"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 fail() { printf 'smoke: %s\n' "$*" >&2; exit 1; }
-[ -x "$maw" ] || fail 'build bin/maw first'
+[ -x "$maw" ] || fail "build executable first: $maw"
 mkdir "$tmp/plugins"
 cat > "$tmp/plugins/maw-probe" <<'PLUGIN'
 #!/bin/sh
@@ -27,7 +28,13 @@ MAW_SMOKE_MARKER="$tmp/marker"
 export MAW_SMOKE_MARKER
 
 # Isolate discovery from any real, potentially operational local plugins.
-run() { PATH="$tmp/plugins" "$maw" "$@"; }
+run() {
+    if [ -n "$entry" ]; then
+        PATH="$tmp/plugins" "$maw" "$entry" "$@"
+    else
+        PATH="$tmp/plugins" "$maw" "$@"
+    fi
+}
 run > "$tmp/default"
 run --help > "$tmp/help"
 cmp "$tmp/default" "$tmp/help"
