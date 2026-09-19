@@ -1,5 +1,6 @@
 const std = @import("std");
 const inventory = @import("inventory.zig");
+extern "c" fn renamex_np(old: [*:0]const u8, new: [*:0]const u8, flags: c_uint) c_int;
 const Meta = struct { name: []const u8, entry: []const u8 };
 fn eql(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);
@@ -131,6 +132,26 @@ const Context = struct {
         if (full and !std.ascii.eqlIgnoreCase(ref, commit)) return error.CommitMismatch;
         return commit;
     }
+    fn publish(c: Context, stage: []const u8, destination: []const u8) !void {
+        // Zig 0.16 renamePreserve uses hard links on macOS, which cannot move
+        // directories. Darwin's RENAME_EXCL provides atomic no-overwrite rename.
+        if (@import("builtin").os.tag == .macos) {
+            const old = try c.a.dupeZ(u8, stage);
+            const new = try c.a.dupeZ(u8, destination);
+            while (true) switch (std.c.errno(renamex_np(old, new, 0x00000004))) {
+                .SUCCESS => return,
+                .INTR => continue,
+                .EXIST, .NOTEMPTY => return error.PathAlreadyExists,
+                .ACCES => return error.AccessDenied,
+                .PERM => return error.PermissionDenied,
+                else => |err| {
+                    try std.Io.File.stderr().writeStreamingAll(c.io, try std.fmt.allocPrint(c.a, "maw: publishing plugin: {s}\n", .{@tagName(err)}));
+                    return error.RenameFailed;
+                },
+            };
+        }
+        try std.Io.Dir.cwd().renamePreserve(stage, std.Io.Dir.cwd(), destination, c.io);
+    }
     fn install(c: Context, root: []const u8, input: []const u8, explicit_ref: ?[]const u8) !u8 {
         var source = input;
         var ref = explicit_ref;
@@ -169,7 +190,7 @@ const Context = struct {
         }
         _ = try c.current(stage);
         const destination = try c.join(&.{ root, m.name });
-        try std.Io.Dir.cwd().renamePreserve(stage, std.Io.Dir.cwd(), destination, c.io);
+        try c.publish(stage, destination);
         try c.out("installed {s}\ncommit {s}\n", .{ m.name, commit });
         return 0;
     }
