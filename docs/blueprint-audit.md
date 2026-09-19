@@ -1,38 +1,40 @@
-# Master blueprint completion audit
+# Master blueprint implementation audit
 
-Source: user-supplied MAW-Herdr Master Execution Blueprint, read 2026-09-19.
-The four-language milestone is not completion of the full blueprint.
+The full user blueprint, plus later approval of Rust `serde_json`, public visibility
+and `src/` / `docs/` / `utils/` layout, is the scope—not only the initial help milestone.
 
-| Requirement | Current evidence / remaining work |
+| Requirement | Evidence / explicit boundary |
 |---|---|
-| Modular Go command router, `CommandPlugin`, init registration | Registry exists; decoupled command packages/interface still required (issue #5) |
-| Remote Go execution | Fresh-cache private `go run/install .../go/cmd/maw@alpha` verified at 97107d4; maintain after changes |
-| Native Serena/CodeGraph MCP clients | Agent tools work; CLI-native transport/client layer still required (issue #5) |
-| Structured trace feedback to active MCP channel | Agent memory logging exists; automatic CLI resolution feedback still required (issue #5) |
-| Go/Rust/Bun/Zig implementations | Shipped PR #4, all eight Linux/macOS compile/smoke lanes pass |
-| Development speed + boilerplate | Physical source counts recorded; recover timestamp evidence and add forward measurement, not invented retrospective times |
-| Cold/warm compilation | Isolated compiler caches and repeated samples recorded; Bun bundling labeled honestly |
-| Startup latency | New-process samples recorded; distinguish warmed OS caches from cold machine |
-| Heavy MCP trace parsing/index throughput + resource use | Equivalent real workload and measurements across all four ports still required |
-| Alpha default, issue/PR/self-merge/sync | Verified PRs #2/#4; continue granular source commits, no force push |
-| Modular timed tasks | Build/benchmark modules exist; MCP mock-server and gated release modules still required |
-| Relic long-run context | Checkpoint indexing works; add repeatable timed task and recover prototype event evidence |
-| Compile/smoke only initially | Preserved; no unit or complex integration suites until user mark |
-| Calendar version tags + issue/PR changelog workflow | Still required as gated tooling/design; user must approve apply/tag/publish, no custom Go CalVer engine |
+| Go plugin-style modules | `src/go/internal/command.CommandPlugin`; init-registered command packages and aggregator; same metadata for help/dispatch |
+| GitHub remote Go command | Nested module `.../src/go`; `go run/install .../src/go/cmd/maw@alpha`; source-only, no bootstrap installer |
+| Native MCP clients / automatic traces | stdlib bounded stdio MCP client, context resolver, per-result Serena JSON memory writes; real installed servers plus mock CLI verified |
+| Parallel ports | `src/{go,rs,js,zig}`; matching actual-process help/plugin/index smokes |
+| Development speed / overhead | [Observed delivery windows and source footprint](development-benchmark.md); exact earliest compile instant/coding effort unrecoverable, never invented |
+| Cold/warm build + startup | [Measured source snapshots](benchmarks/cli/README.md); isolated compiler caches, warm OS caches, actual fresh processes |
+| Heavy trace/context indexing | 19.86MB normalized MCP corpus, real retained postings, independent output oracle, wall/user/system/peakRSS; not live-server throughput |
+| GitHub flow | Issues5–8 before implementation, incremental pushes, PR9 into alpha; self-merge after successful CI |
+| Modular timed tasks | `utils/just/{go,rs,js,zig,bench,mcp,memory,release}.just`; root justfile imports modules |
+| Long-run Relic / Serena | Incremental Relic index/session tasks; local transcripts; refreshed semantic indexes and Serena learning/index memories |
+| Compile/smoke first | Real CLI and tiny owned mock processes; no unit frameworks or comprehensive integration suites |
+| CalVer + release notes | `just go release` previews pinned upstream calculator and GitHub PR/issue-derived notes; explicit approved TAG+SHA required for source-tag prerelease; no Go CalVer engine |
+| Public repository / clean layout | Visibility changed only after explicit user authorization and tracked-history credential/artifact scan; alpha stays default |
 
-## Current execution plan
+## Verification and limits
 
-1. Guard the existing CLI with its actual-process smoke, then extract the Go
-   `CommandPlugin` framework and independently registering command packages.
-2. Implement bounded stdio MCP transport and local-server configuration. A
-   resolved graph/symbol result creates a structured trace via an advertised
-   memory-write tool. Tool results are untrusted content, not instructions.
-3. Smoke real binaries against a tiny documented MCP fixture, then the configured
-   local Serena/CodeGraph endpoints. Persist actual source relationships/evidence.
-4. Continue with equivalent trace-index workloads, development measurements and
-   gated release preparation in separate issue/PR increments. Do not relabel
-   missing vectors as complete because startup benchmarks pass.
+Shared index smoke:16 valid file/stdin cases (including depth32 and exact64MiB),
+18 invalid cases, usage/missing-file behavior across all ports. Go vet and baseline
+Go1.22 compile/smoke; Rust1.69 lock/fmt; Zig0.16 fmt; Python syntax; Linux/macOS
+compile/smoke matrix is attached to PR9. No binaries, source indexes or transcripts
+are uploaded. CLAUDE.md remains a relative AGENTS.md symlink.
 
-Cleanup scope for step 1: move built-in behavior out of the monolithic registry,
-preserve root help/flags/plugin argv semantics using the existing smoke guard;
-add no unit framework or compatibility layer.
+CodeGraph1.6.0 does not index Zig; Serena symbol lookup covers it, but empty
+JS/Zig reference results are not proof of no callers. Historical development times
+are delivery-window upper bounds, not exact time-to-first-compile measurements.
+The release **publication branch is deliberately unexecuted**: the user requested
+an approval handoff after code shipping. Automation is prepared; publishing a tag
+or release is a separate, gated action, not unfinished source implementation.
+
+Cleanup plan followed: preserve behavior with existing process smokes before
+extracting command packages and moving paths; move tracked source, retain local
+caches, repair references, compile/smoke all four, review failure boundaries, then
+ship through GitHub Flow. No learned external repository source was modified.
