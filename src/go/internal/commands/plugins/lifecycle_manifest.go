@@ -51,6 +51,15 @@ func candidateManifest(ctx context.Context, dir, ref string) (string, string, er
 	if err != nil || !utf8.ValidString(data) || json.Unmarshal([]byte(data), &m) != nil || m == nil {
 		return "", "", fmt.Errorf("invalid plugin.json")
 	}
+	name, entry, err := manifestEntry(m)
+	if err != nil {
+		return "", "", err
+	}
+	_, err = treeBlob(ctx, dir, ref, entry)
+	return name, entry, err
+}
+
+func manifestEntry(m map[string]any) (string, string, error) {
 	name, version, entry := stringField(m, "name"), stringField(m, "version"), stringField(m, "entry")
 	if entry == "" {
 		entry = stringField(objectField(m, "artifact"), "path")
@@ -61,8 +70,7 @@ func candidateManifest(ctx context.Context, dir, ref string) (string, string, er
 	if !lifecycleName(name) || version == "" || safePath(version) != version || !lifecycleEntry(entry) {
 		return "", "", fmt.Errorf("invalid plugin name, version or entry")
 	}
-	_, err = treeBlob(ctx, dir, ref, entry)
-	return name, entry, err
+	return name, entry, nil
 }
 
 func regularEntry(dir, entry string) error {
