@@ -49,7 +49,9 @@ for line in sys.stdin:
             continue
         result = {"content": [{"type": "text", "text": "fixture result"}]}
         if name == "write_memory":
-            if mode == "persistence-error":
+            if mode == "missing-content":
+                result = {}
+            elif mode == "persistence-error":
                 result = {"isError": True, "content": [{"type": "text", "text": "fixture persistence denied\n\u001b[31m"}]}
             else:
                 trace = json.loads(arguments["content"])

@@ -307,18 +307,22 @@ func (c *Client) CallTool(ctx context.Context, name string, args any) (json.RawM
 		return result, errors.New("MCP tools/call result must be an object")
 	}
 	var status struct {
-		IsError bool `json:"isError"`
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
+		Content json.RawMessage `json:"content"`
+		IsError bool            `json:"isError"`
 	}
 	if err := json.Unmarshal(result, &status); err != nil {
 		return result, fmt.Errorf("MCP tools/call result: %w", err)
 	}
+	var content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if len(bytes.TrimSpace(status.Content)) == 0 || bytes.TrimSpace(status.Content)[0] != '[' || json.Unmarshal(status.Content, &content) != nil {
+		return result, errors.New("MCP tools/call result requires content array")
+	}
 	if status.IsError {
 		detail := ""
-		for _, item := range status.Content {
+		for _, item := range content {
 			if item.Type == "text" && item.Text != "" {
 				detail = item.Text
 				break

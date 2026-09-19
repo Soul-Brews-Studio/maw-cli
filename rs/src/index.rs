@@ -40,7 +40,10 @@ fn build(bytes: &[u8]) -> Result<Value, String> {
     let mut symbols = HashSet::new();
     let (mut records, mut text_bytes) = (0usize, 0usize);
     for (line_number, line) in input.split('\n').enumerate() {
-        if line.trim_matches(|c| matches!(c, ' ' | '\t' | '\r')).is_empty() {
+        if line
+            .trim_matches(|c| matches!(c, ' ' | '\t' | '\r'))
+            .is_empty()
+        {
             continue;
         }
         let record: Value = serde_json::from_str(line)

@@ -16,7 +16,9 @@ The JSON-RPC version must be `2.0`; `result.structuredContent.file`, `symbol`,
 and `text` must be strings. File/symbol are nonempty and must not contain NUL.
 Extra fields are allowed. Normalized records use unique object member names and
 finite representable numbers; duplicate keys and extreme numeric overflow are
-outside this comparison domain (parser-specific rejection/overwrite behavior). This is a documented normalized context result schema,
+outside this comparison domain (parser-specific rejection/overwrite behavior).
+Normalized input nesting is at most 32 arrays/objects deep; deeper arbitrary
+JSON is outside the benchmark domain because parser recursion limits differ. This is a documented normalized context result schema,
 not an assumption that every Serena/CodeGraph tool emits these fields natively.
 JSON framing whitespace-only lines (space/tab/CR/LF) are ignored; final newline optional. Malformed JSON,
 invalid UTF-8, unpaired UTF-16 surrogate escapes, absent/wrong fields, and input over 64 MiB fail with nonzero exit

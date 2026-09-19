@@ -70,8 +70,9 @@ def main():
         expected = {f"smoke ({system}, {language})" for system in ("ubuntu-latest", "macos-latest") for language in ("go", "rs", "js", "zig")}
         if checks["total_count"] > 100 or not expected.issubset(names) or any(check["status"] != "completed" or check["conclusion"] not in ("success", "skipped", "neutral") for check in checks["check_runs"]):
             raise RuntimeError("all eight compile/smoke checks must pass before publication")
-    # ls-remote fails on authentication/network errors rather than treating them as absent.
-    if run("git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"):
+    # Query the same canonical repository used by all publication gates. API
+    # failures propagate; never treat authentication/network errors as absence.
+    if any(ref["ref"] == f"refs/tags/{tag}" for ref in api(f"repos/{REPO}/git/matching-refs/tags/{tag}")):
         raise RuntimeError("tag already exists; preview a new minute slot")
     notes = api(f"repos/{REPO}/releases/generate-notes", "--method", "POST", "-f", f"tag_name={tag}", "-f", f"target_commitish={commit}")
     result = dict(mode="publish" if args.publish else "preview", tag=tag, commit=commit,
@@ -81,8 +82,8 @@ def main():
         print(json.dumps(result, indent=2))
         return
     # Nothing below this gate is reached by the default preview.
-    subprocess.run(["git", "tag", "-a", tag, commit, "-m", tag], cwd=ROOT, check=True)
-    subprocess.run(["git", "push", "origin", f"refs/tags/{tag}"], cwd=ROOT, check=True)
+    annotation = api(f"repos/{REPO}/git/tags", "--method", "POST", "-f", f"tag={tag}", "-f", f"message={tag}", "-f", f"object={commit}", "-f", "type=commit")
+    api(f"repos/{REPO}/git/refs", "--method", "POST", "-f", f"ref=refs/tags/{tag}", "-f", f"sha={annotation['sha']}")
     with tempfile.TemporaryDirectory(prefix="maw-release-notes-") as temporary:
         path = Path(temporary) / "notes.md"
         path.write_text(notes["body"] + "\n")

@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="maw-mcp-smoke-") as temporary:
         check(events[-1].get("event") == "eof", "server did not close normally")
         if role == "codegraph":
             check(events[0]["privacy"] == ["1", "0"], "telemetry not disabled")
-    for mode, diagnostic in (("persistence-error", "persistence failed"), ("bad-protocol", "unsupported MCP protocol"), ("bad-schema", "invalid tool descriptor")):
+    for mode, diagnostic in (("missing-content", "requires content array"), ("persistence-error", "persistence failed"), ("bad-protocol", "unsupported MCP protocol"), ("bad-schema", "invalid tool descriptor")):
         result, _ = run(mode)
         check(result.returncode != 0 and not result.stdout and diagnostic in result.stderr, f"{mode}: {result.stderr}")
         if mode == "persistence-error":
