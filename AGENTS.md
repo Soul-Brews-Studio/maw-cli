@@ -86,6 +86,19 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   validate candidate metadata before mutation. Label the entry Git blob hash
   honestly; it is not a SHA-256 package checksum or publisher signature. Keep all
   ports covered by utils/scripts/lifecycle-smoke.py; no new unit framework.
+- Go-only additions: marketplace includes local installed/version/ref/commit
+  details; plugin install/update accept @REF or #REF aliases for --ref. Keep
+  listing read-only, report unavailable/corrupt Git metadata honestly, and do
+  not claim these additional forms exist in other ports. Cover them with the
+  marketplace-smoke.py and selector-smoke.py actual-process fixtures.
+- Go `update` self-replaces from published maw-cli alpha assets using only the
+  standard library. Follow docs/self-update.md: bounded HTTPS, archive/metadata
+  checksums, exact candidate version proof before single-rename replacement,
+  no default source downgrade, and no plugin/config/cache changes. `--check`
+  never installs; local dev builds do not self-replace. Go-installed binaries
+  can transition to prebuilts. Never point tests at the user's executable;
+  update-smoke.py uses source overlays/local TLS/copied binaries. Other ports
+  do not yet self-update. No new runtime libraries/system tools were approved.
 - Installed command dispatch is a separate, explicit subprocess operation after
   builtin/PATH lookup. Reuse inventory selection and disabled state. Only standalone
   Bun scripts declaring `runtime=bun-dev`, `target=js`, `cli.interactive=true` are

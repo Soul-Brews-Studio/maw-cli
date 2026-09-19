@@ -22,8 +22,17 @@ maw-cli; it does not change an unrelated older `maw` executable on PATH.
 
 - `marketplace [ls|list]` prints a header and the known `herdr` repository. It is
   a static convenience list, not a package registry or a trust endorsement.
+  Go additionally reports local installed/disabled/invalid status, manifest
+  version, available branch/exact-tag/detached ref and 12-character Git commit.
+  No network lookup. Missing metadata is `-`; corrupt/unreadable Git metadata
+  produces a warning, not invented version information. Non-Git installs still
+  show their manifest version.
 - `plugin install SOURCE [--ref REF]` accepts `herdr`, `owner/repo`, an HTTPS Git
   URL, or an existing local Git directory. `owner/repo@REF` is shorthand.
+  Go also accepts SOURCE#REF, HTTPS URL selectors, and update NAME@REF/NAME#REF.
+  These normalize to --ref; duplicate or empty selectors fail. Existing local
+  directories with literal @/# names take precedence over selector parsing.
+  Quote # arguments for shell safety. Other ports retain existing --ref syntax.
   This basic installer targets public HTTPS/local repositories; ambient Git
   configuration and interactive credential prompts are disabled.
   Install into the existing configured plugin root. Never overwrite an existing
