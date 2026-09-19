@@ -2,10 +2,10 @@
 
 ## Boundaries
 
-`go/cmd/maw` wires standard streams, interrupt cancellation, and version information
-into `go/internal/cli.Run`. It returns the command's exit status to the shell.
+`src/go/cmd/maw` wires standard streams, interrupt cancellation, and version information
+into `src/go/internal/cli.Run`. It returns the command's exit status to the shell.
 
-`go/internal/cli` holds a registry of command descriptors. Each descriptor owns its
+`src/go/internal/cli` holds a registry of command descriptors. Each descriptor owns its
 name, summary, usage and handler. `help`, `version`, and `plugins` register through
 the same representation used for external commands. Help and execution resolve
 the same registry, so an unavailable future command is not presented as working.
@@ -14,7 +14,7 @@ The only central aliases are `-h`/`--help` and `-v`/`--version`. There is no
 catch-all agent shorthand, network service, automatic installation or fuzzy
 prefix execution. A typo must not turn into an operational command.
 
-`go/internal/cli/plugins.go` discovers executable files, and invokes explicitly
+`src/go/internal/cli/plugins.go` discovers executable files, and invokes explicitly
 selected plugins with `os/exec` and an argument slice, not a shell command string.
 Core dependencies are the standard library only. Existing Go code need not link
 against an SDK to provide a plugin; any language can implement the process contract.
@@ -27,17 +27,17 @@ There is no version-bump or release engine.
 
 | Directory | Entry / router | Plugin process boundary |
 |---|---|---|
-| `go/` | `cmd/maw/main.go`, `internal/cli/cli.go` | `internal/cli/plugins.go` |
-| `rs/` | `src/main.rs`, `src/cli.rs` | `src/plugins.rs` |
-| `js/` | `src/cli.ts` via Bun | `src/plugins.ts` |
-| `zig/` | `src/main.zig` | `src/registry.zig` discovers; `Host.execute` spawns |
+| `src/go/` | `cmd/maw/main.go`, `internal/cli/cli.go` | `internal/cli/plugins.go` |
+| `src/rs/` | `src/main.rs`, `src/cli.rs` | `src/plugins.rs` |
+| `src/js/` | `src/cli.ts` via Bun | `src/plugins.ts` |
+| `src/zig/` | `src/main.zig` | `src/registry.zig` discovers; `Host.execute` spawns |
 
 These are fresh ports of this small contract, not copies of the external learned
 maw-rs/maw-js repositories. Each owns its manifest and generated cache/output.
-Root `go.work` assists local Go navigation; the standalone module is `go/go.mod`.
-Shared `scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
+Root `go.work` assists local Go navigation; the standalone module is `src/go/go.mod`.
+Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark
-methodology is [here](../benchmarks/cli/README.md); comparisons cover the actual
+methodology is [here](benchmarks/cli/README.md); comparisons cover the actual
 prototype implementations, not general language speed.
 
 ## Reference evidence and deliberate differences

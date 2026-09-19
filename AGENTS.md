@@ -7,8 +7,8 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 
 ## Lean Go CLI and shipping
 
-- Polyglot layout: `go/` is the core Go module, `rs/` the Rust port, `js/` the Bun
-  port, `zig/` the Zig port. These are independent implementations of the shared
+- Polyglot layout: `src/go/` is the core Go module, `src/rs/` the Rust port, `src/js/` the Bun
+  port, `src/zig/` the Zig port. These are independent implementations of the shared
   CLI contract, not vendored maw-js/maw-rs repositories. Keep manifests/cache/output
   isolated, and validate the same actual-process smoke fixture across ports.
 - `just dev all` builds/smokes all ports; `just <go|rs|js|zig> check` selects one.

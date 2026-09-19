@@ -74,7 +74,7 @@ Reproduce the initial shared milestone from committed files, not today's expande
 Go MCP/framework code or generated bundles:
 
 ```sh
-python3 scripts/development-evidence.py footprint --commit 0d494d9
+python3 utils/scripts/development-evidence.py footprint --commit 0d494d9
 ```
 
 Snapshot: `0d494d9e460f1bda64ccb0685c236a166dc8621a`.
@@ -98,12 +98,12 @@ smoke contract does not imply complete behavioral equivalence.
 ## Forward measurement for the next increment
 
 ```sh
-python3 scripts/development-evidence.py start issue-next-go
+python3 utils/scripts/development-evidence.py start issue-next-go
 # Perform the bounded implementation, compile, and actual CLI smoke.
-python3 scripts/development-evidence.py finish issue-next-go --verified-compile-smoke
+python3 utils/scripts/development-evidence.py finish issue-next-go --verified-compile-smoke
 ```
 
-Records stay under ignored `benchmarks/cli/results/development/`. Use a new
+Records stay under ignored `docs/benchmarks/cli/results/development/`. Use a new
 non-sensitive label for each increment. Start records cannot be overwritten;
 finish requires explicit operator attestation of compile/smoke success, not an
 automatic inference. The script records monotonic elapsed wall seconds, UTC,
@@ -114,5 +114,5 @@ toolchain differences when interpreting the interval. A start/finish near an
 actual success provides a tighter observation, still not active coding effort.
 
 This development vector complements startup/build measurements in
-`benchmarks/cli/README.md` and trace-index workload measurements; none substitutes
+`docs/benchmarks/cli/README.md` and trace-index workload measurements; none substitutes
 for the others. No universal ranking or productivity speedup is claimed.

@@ -9,7 +9,7 @@ implement this command yet. This is not the offline `index` workload.
 just go build
 bin/maw-go context --help
 bin/maw-go context --config ~/.config/maw/mcp.json --project . \
-  --file go/internal/cli/cli.go --symbol Run 'command dispatch'
+  --file src/go/internal/cli/cli.go --symbol Run 'command dispatch'
 ```
 
 Flags precede positional query text. Query-only calls use CodeGraph exploration;
