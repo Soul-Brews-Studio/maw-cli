@@ -1,7 +1,7 @@
 # maw-herdr
 
 One lean CLI contract, four independent implementations for comparison.
-Help first; operational commands remain external executable plugins.
+Help first; modular built-ins plus external executable plugins.
 
 ```text
 go/     core maw in Go      → bin/maw-go (remote install name: maw)
@@ -13,8 +13,10 @@ scripts/ shared actual-CLI smoke and benchmark harness
 ```
 
 These are new small ports—not vendored copies of the external maw-js/maw-rs
-projects. They implement `help`, `version`, `plugins`, and `maw <plugin> [args...]`.
-No tmux service, agent engine, runtime package dependencies or release machinery.
+projects. They implement `help`, `version`, `plugins`, `index FILE|-`, and external
+`maw <plugin> [args...]`. Go additionally provides the native MCP `context` command.
+No tmux service or agent engine. Rust uses the approved `serde_json`; other ports
+use standard/built-in JSON parsing.
 
 ## Build and smoke
 
@@ -27,6 +29,10 @@ just go check        # compile + real CLI smoke; same for rs, js, zig
 just dev all         # all four ports
 just bench run       # startup samples, raw JSON saved locally
 just bench builds    # also isolated-cache + repeated build measurements
+just bench index     # normalized MCP JSONL postings, wall/CPU/peak RSS
+just mcp check       # Go context against tiny local stdio mock
+just memory index    # incremental Relic checkpoint, kept local
+just go release      # read-only CalVer + GitHub release-notes preview
 ```
 
 No unit tests yet. Each smoke run uses a harmless isolated executable plugin:
@@ -39,7 +45,9 @@ Each build reuses its language's cache; smoke calls compiled/bundled output rath
 than recompiling per assertion. Native optimized builds and Bun-bundled source
 are different deployment models: see [benchmark methodology](benchmarks/cli/README.md).
 Startup samples are new processes with warmed OS caches, not cold-machine tests.
-Heavy MCP throughput and development productivity are **not yet measured**.
+The [index workload](docs/trace-index-contract.md) measures local parsing/indexing,
+not live MCP server throughput. [Development evidence](docs/development-benchmark.md)
+records observed delivery windows and footprint, not a language productivity ranking.
 
 ## Run Go from GitHub — like bunx/npx
 
@@ -65,6 +73,18 @@ separately and preserve your other private-module patterns. The former root
 [Go remote command docs](https://go.dev/doc/go1.17#go-command),
 [private module docs](https://go.dev/ref/mod#private-modules).
 
+## Native MCP context (Go)
+
+```sh
+bin/maw-go context --config /path/to/trusted-mcp.json --project . \
+  --file go/internal/cli/cli.go --symbol Run 'command dispatch'
+```
+
+See [MCP configuration and trace contract](docs/mcp.md). Every successful resolution
+persists a metadata-only JSON trace to the active Serena memory tool before CLI
+success. Server commands are trusted local executables, not sandboxed. Help never
+starts servers. Legacy MCP versions are explicit; no claim of universal/latest support.
+
 ## Plugins and learning
 
 A trusted executable named `maw-hello` on an absolute PATH entry becomes
@@ -78,6 +98,6 @@ relationships. `relic index` retains conversation history locally. Raw transcrip
 indexes, build outputs and benchmark result JSON are not uploaded.
 
 Git flow: issue → focused feature commits → PR into `alpha` → verify → self-merge
-→ sync `alpha`. No releases/tags in this increment. `$calver` remains a separate
-handoff; its installed script targets arra, so it must not mutate that repo here.
+→ sync `alpha`. No releases/tags without approval. [Gated release tasks](docs/release.md) reuse
+the pinned upstream CalVer calculator without mutating arra.
 `CLAUDE.md` is a relative symlink to [AGENTS.md](AGENTS.md).

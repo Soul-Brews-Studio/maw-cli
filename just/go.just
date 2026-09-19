@@ -8,3 +8,7 @@ smoke:
     /usr/bin/time -p sh scripts/smoke.sh "$(pwd)/bin/maw-go"
 
 check: build smoke
+
+# Go has no built-in `go release`; this task previews our gated source release.
+release:
+    /usr/bin/time -p python3 scripts/release.py
