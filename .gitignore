@@ -7,9 +7,18 @@
 /.codegraph/
 __pycache__/
 
+# Retained local output from the pre-src layout
 # Per-language build caches/output
 /rs/target/
 /js/dist/
 /zig/.zig-cache/
 /zig/zig-out/
 /benchmarks/cli/results/
+
+# Current source-layout build output
+/src/rs/target/
+/src/js/dist/
+/src/zig/.zig-cache/
+/src/zig/zig-out/
+
+/docs/benchmarks/cli/results/

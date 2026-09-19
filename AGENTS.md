@@ -7,23 +7,27 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 
 ## Lean Go CLI and shipping
 
-- Polyglot layout: `go/` is the core Go module, `rs/` the Rust port, `js/` the Bun
-  port, `zig/` the Zig port. These are independent implementations of the shared
+- Polyglot layout: `src/go/` is the core Go module, `src/rs/` the Rust port, `src/js/` the Bun
+  port, `src/zig/` the Zig port. These are independent implementations of the shared
   CLI contract, not vendored maw-js/maw-rs repositories. Keep manifests/cache/output
   isolated, and validate the same actual-process smoke fixture across ports.
 - `just dev all` builds/smokes all ports; `just <go|rs|js|zig> check` selects one.
   `just bench run` measures startup; `just bench builds` includes build samples.
-  Do not report heavy MCP throughput or time-to-prototype measurements until
-  equivalent workloads and evidence exist. No synthetic numbers or language rankings.
+  `just bench index` measures normalized trace parsing, real postings and per-child
+  CPU/RSS. Keep development delivery windows distinct from exact first-build times. No synthetic numbers or language rankings.
 - After moves or branch switches, explicitly sync CodeGraph and verify a known
   symbol: `status` can say no changes even when transient checkout events removed
   symbols. Serena's live project config can also remain cached; persisted config
   plus a fresh verified MCP connection is different from reloading the old one.
 
-- Start with a small, standard-library-only `maw` host. Commands share registry
-  metadata for help and dispatch; operational features belong in separate plugins.
+- Start with a small, standard-library-only Go `maw` host. Commands share registry
+  metadata for help and dispatch; new built-ins use `CommandPlugin` packages with init-time factory registration.
+  External executable plugins keep their separate process boundary.
+- Rust alone may use the explicitly approved `serde_json`; preserve its pinned
+  Rust 1.69-compatible lockfile. No other direct dependencies without approval.
 - Compile first, then smoke-call the actual CLI. Unit tests are deferred until
-  the user explicitly requests them. Do not add test frameworks or release machinery.
+  the user explicitly requests them. Do not add test frameworks. Release tooling
+  stays preview-only unless the user explicitly approves the exact tag/commit.
 - Keep development tasks in a small root `justfile` with `mod` files. Reuse Go's
   build cache, build once per smoke run, and record wall-clock iteration samples
   with the exact command/environment. Do not infer broad speedups from small samples.
@@ -31,8 +35,9 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   verify compile/smoke, merge, then checkout `alpha` and pull fast-forward-only.
 - Source only for now: no binary uploads, automatic tags, releases, or visibility
   changes. Ask the user about `$calver` after shipping code. The installed skill
-  targets arra-oracle-skills-cli; do not invent a Go CalVer engine or mutate arra
-  while working on maw-herdr.
+  targets arra-oracle-skills-cli; our pinned pure-calculator adapter never runs
+  its mutating main entrypoint. Do not invent a Go CalVer engine or mutate arra.
+  `just go release` previews; `just release publish TAG SHA` requires user approval.
 - Use `relic` CLI incrementally to retain long-session context. Read only relevant
   history and keep raw transcripts/index databases local. Active sessions may
   remain changed immediately after indexing; do not loop trying to reach zero.

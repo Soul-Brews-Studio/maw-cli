@@ -30,30 +30,37 @@ jobs:
         with:
           bun-version: '1.3.11'
       - if: matrix.language == 'zig'
-        run: python3 scripts/install-zig-ci.py
+        run: python3 utils/scripts/install-zig-ci.py
       - name: Compile and smoke (no unit tests or artifact uploads)
         env:
           MAW_LANGUAGE: ${{ matrix.language }}
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
         run: |
           case "$MAW_LANGUAGE" in
             go)
               go version
-              /usr/bin/time -p go -C go build -o ../bin/maw-go ./cmd/maw
-              sh scripts/smoke.sh "$PWD/bin/maw-go"
+              /usr/bin/time -p go -C src/go build -o ../../bin/maw-go ./cmd/maw
+              sh utils/scripts/smoke.sh "$PWD/bin/maw-go"
+              go -C src/go vet ./...
+              python3 utils/scripts/mcp-smoke.py "$PWD/bin/maw-go"
+              python3 utils/scripts/index-smoke.py -- "$PWD/bin/maw-go"
               ;;
             rs)
               rustup run 1.69.0 rustc --version
-              /usr/bin/time -p rustup run 1.69.0 cargo build --release --manifest-path rs/Cargo.toml
-              sh scripts/smoke.sh "$PWD/rs/target/release/maw-rs"
+              /usr/bin/time -p rustup run 1.69.0 cargo build --locked --release --manifest-path src/rs/Cargo.toml
+              sh utils/scripts/smoke.sh "$PWD/src/rs/target/release/maw-rs"
+              python3 utils/scripts/index-smoke.py -- "$PWD/src/rs/target/release/maw-rs"
               ;;
             js)
               bun --version
-              /usr/bin/time -p bun build js/src/cli.ts --target=bun --outdir js/dist
-              sh scripts/smoke.sh "$(command -v bun)" "$PWD/js/dist/cli.js"
+              /usr/bin/time -p bun build src/js/src/cli.ts --target=bun --outdir src/js/dist
+              sh utils/scripts/smoke.sh "$(command -v bun)" "$PWD/src/js/dist/cli.js"
+              python3 utils/scripts/index-smoke.py -- "$(command -v bun)" "$PWD/src/js/dist/cli.js"
               ;;
             zig)
               zig version
-              (cd zig && /usr/bin/time -p zig build -Doptimize=ReleaseFast)
-              sh scripts/smoke.sh "$PWD/zig/zig-out/bin/maw-zig"
+              (cd src/zig && /usr/bin/time -p zig build -Doptimize=ReleaseFast)
+              sh utils/scripts/smoke.sh "$PWD/src/zig/zig-out/bin/maw-zig"
+              python3 utils/scripts/index-smoke.py -- "$PWD/src/zig/zig-out/bin/maw-zig"
               ;;
           esac

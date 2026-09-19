@@ -72,8 +72,24 @@ are maw-herdr design decisions, not upstream behavior claims.
 
 ## Adding a built-in
 
-Only host-essential commands should be built in. Add one descriptor/handler to
-the registry in `go/internal/cli`, with usage, summary and argument validation.
+Only host-essential commands should be built in. Register a `CommandPlugin` factory in its package `init`, then blank-import
+the package from `src/go/internal/commands/register.go`.
 Smoke-call it now; unit tests wait for the user's explicit mark.
 It automatically participates in help/listing; no separate help catalog to edit.
 Prefer an external plugin for operational commands so the host stays lean.
+
+## Go built-in modules
+
+`src/go/internal/command.CommandPlugin` defines `Metadata`, `BindFlags(*flag.FlagSet)`
+and `Run(context.Context, *Invocation) int`. Each built-in package calls
+`command.Register(factory)` in `init`; `internal/commands/register.go` links packages
+with blank imports. The router copies factories, creates fresh command instances,
+and derives help/dispatch from the same metadata. Invocation carries streams,
+version, positional args, catalog and nested dispatch. Only flag-declaring built-ins
+use Go flag parsing; external plugin argv is untouched. Flags precede positionals.
+`context --help` and `help context` only read metadata.
+
+`index` is shared across ports. `context` is currently Go-only. These names are
+reserved wherever built in; adding a command requires importing its package, not
+editing a switch ladder. This is static package registration, **not** Go shared-library
+plugins or runtime-loaded code. No dependency framework.
