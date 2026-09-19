@@ -18,12 +18,15 @@ func (p *plugin) Metadata() command.Metadata {
 	if p.legacy {
 		return command.Metadata{Name: "plugins", Summary: "Alias for plugin ls", Usage: "maw plugins [ls] [-v|--verbose] [--all]"}
 	}
-	return command.Metadata{Name: "plugin", Summary: "List installed plugin metadata", Usage: "maw plugin ls [-v|--verbose] [--all]"}
+	return command.Metadata{Name: "plugin", Summary: "List, install, update and inspect plugins", Usage: "maw plugin ls|list [-v|--verbose] [--all] | install SOURCE [--ref REF] | update NAME [--ref REF] | info|check NAME"}
 }
 func (*plugin) BindFlags(*flag.FlagSet) {}
-func (p *plugin) Run(_ context.Context, i *command.Invocation) int {
+func (p *plugin) Run(ctx context.Context, i *command.Invocation) int {
 	args := i.Args
-	if len(args) > 0 && args[0] == "ls" {
+	if len(args) > 0 && (args[0] == "install" || args[0] == "update" || args[0] == "info" || args[0] == "check") {
+		return lifecycle(ctx, i)
+	}
+	if len(args) > 0 && (args[0] == "ls" || args[0] == "list") {
 		args = args[1:]
 	} else if !p.legacy {
 		return i.Fail("usage: " + p.Metadata().Usage)

@@ -25,7 +25,7 @@ exit 7
 PLUGIN
 chmod +x "$tmp/plugins/maw-probe"
 # Host binaries must be excluded; both listing built-ins must win PATH collisions.
-for host in go rs js zig plugin plugins; do
+for host in go rs js zig plugin plugins marketplace; do
     cat > "$tmp/plugins/maw-$host" <<'HOST'
 #!/bin/sh
 printf 'host ran\n' >> "$MAW_SMOKE_MARKER"
@@ -57,6 +57,10 @@ run plugin ls > "$tmp/plugin-ls"
 run plugins ls > "$tmp/plugins-ls"
 cmp "$tmp/plugins-list" "$tmp/plugin-ls"
 cmp "$tmp/plugins-list" "$tmp/plugins-ls"
+run plugin list > "$tmp/plugin-list"
+cmp "$tmp/plugin-ls" "$tmp/plugin-list"
+run marketplace > "$tmp/marketplace"
+grep -q 'Soul-Brews-Studio/maw-herdr-plugin' "$tmp/marketplace"
 [ ! -e "$tmp/home" ] || fail 'listing created plugin/config directories'
 grep -q '^  plugin[[:space:]]' "$tmp/help"
 if grep -q '^  index[[:space:]]' "$tmp/help" || grep -q '^index[[:space:]]' "$tmp/plugin-ls"; then
@@ -73,9 +77,9 @@ grep -q 'unknown command' "$tmp/err"
 run plugin --help > "$tmp/list-help"
 run help plugin > "$tmp/list-help-alias"
 cmp "$tmp/list-help" "$tmp/list-help-alias"
-grep -q 'Usage: maw plugin ls' "$tmp/list-help"
+grep -q 'Usage: maw plugin ' "$tmp/list-help"
 for name in plugin plugins; do
-    for argument in install list LS; do
+    for argument in install update info check LS; do
         status=0
         run "$name" "$argument" > "$tmp/out" 2> "$tmp/err" || status=$?
         [ "$status" -eq 2 ] || fail "unsupported plugin operation: $name $argument: $status"
@@ -88,7 +92,7 @@ done
 status=0
 run plugin > "$tmp/out" 2> "$tmp/err" || status=$?
 [ "$status" -eq 2 ] || fail "missing plugin subcommand: $status"
-grep -q 'usage: maw plugin ls' "$tmp/err"
+grep -q 'usage: maw plugin ' "$tmp/err"
 for host in go rs js zig; do
     if grep -q "^$host[[:space:]]" "$tmp/plugins-list"; then
         fail "host binary discovered as plugin: $host"
@@ -124,7 +128,9 @@ printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin ar
 if [ -n "$entry" ]; then
     python3 utils/scripts/plugin-smoke.py -- "$maw" "$entry"
     python3 utils/scripts/dispatch-smoke.py -- "$maw" "$entry"
+    python3 utils/scripts/lifecycle-smoke.py -- "$maw" "$entry"
 else
     python3 utils/scripts/plugin-smoke.py -- "$maw"
     python3 utils/scripts/dispatch-smoke.py -- "$maw"
+    python3 utils/scripts/lifecycle-smoke.py -- "$maw"
 fi

@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const registry = @import("registry.zig");
+const lifecycle = @import("lifecycle.zig");
 const inventory = @import("inventory.zig");
 
 const Host = struct {
@@ -84,7 +85,11 @@ const Host = struct {
                 if (args.len != 1) return self.fail("usage: maw version");
                 try self.output(.stdout(), "maw {s}\n", .{build_options.version});
             },
-            .plugins => return inventory.run(self.allocator, self.io, self.env, args[1..], eql(name, "plugins")),
+            .plugins => return lifecycle.run(self.allocator, self.io, self.env, args[1..], eql(name, "plugins")),
+            .marketplace => {
+                if (args.len > 2 or (args.len == 2 and !eql(args[1], "ls") and !eql(args[1], "list"))) return self.fail("usage: maw marketplace [ls|list]");
+                try self.output(.stdout(), "NAME\tSOURCE\nherdr\thttps://github.com/Soul-Brews-Studio/maw-herdr-plugin\n", .{});
+            },
         }
         return 0;
     }

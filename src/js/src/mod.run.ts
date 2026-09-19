@@ -6,7 +6,8 @@ import { unknown } from "./mod.unknown";
 import { rootHelp } from "./mod.rootHelp";
 import { help } from "./mod.help";
 import { showVersion } from "./mod.showVersion";
-import { listPlugins } from "./mod.listPlugins";
+import { pluginLifecycle } from "./mod.pluginLifecycle";
+import { marketplace } from "./mod.marketplace";
 import type { Command } from "./types";
 
 export async function run(args: string[]): Promise<number> {
@@ -17,13 +18,14 @@ export async function run(args: string[]): Promise<number> {
     run: showVersion,
   });
   registry.set("plugin", {
-    name: "plugin", summary: "List installed plugin metadata", usage: "maw plugin ls [-v|--verbose] [--all]",
-    run: (args) => listPlugins(args),
+    name: "plugin", summary: "Manage installed plugins", usage: "maw plugin ls [-v|--verbose] [--all]|list|install SOURCE [--ref REF]|update NAME [--ref REF]|info NAME|check NAME",
+    run: (args) => pluginLifecycle(args),
   });
   registry.set("plugins", {
-    name: "plugins", summary: "Alias for plugin ls", usage: "maw plugins [ls] [-v|--verbose] [--all]",
-    run: (args) => listPlugins(args, true),
+    name: "plugins", summary: "Alias for plugin; bare invocation lists", usage: "maw plugins [ls|list] [-v|--verbose] [--all]|install SOURCE [--ref REF]|update NAME [--ref REF]|info NAME|check NAME",
+    run: (args) => pluginLifecycle(args, true),
   });
+  registry.set("marketplace", { name: "marketplace", summary: "List known plugin sources", usage: "maw marketplace [ls|list]", run: marketplace });
   for (const [name, path] of discover()) {
     if (registry.has(name)) continue;
     registry.set(name, { name, path, summary: "External plugin", run: (args) => execute(path, args) });
