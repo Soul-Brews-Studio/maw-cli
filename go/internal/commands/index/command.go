@@ -43,7 +43,24 @@ func (*plugin) Run(ctx context.Context, invocation *command.Invocation) int {
 		defer file.Close()
 		input = file
 	}
-	data, err := io.ReadAll(io.LimitReader(input, maxBytes+1))
+	type readResult struct {
+		data []byte
+		err  error
+	}
+	completed := make(chan readResult, 1)
+	go func() { data, err := io.ReadAll(io.LimitReader(input, maxBytes+1)); completed <- readResult{data, err} }()
+	var data []byte
+	var err error
+	select {
+	case result := <-completed:
+		data, err = result.data, result.err
+	case <-ctx.Done():
+		// The CLI owns its input stream; closing it also releases a blocked read.
+		if closer, ok := input.(io.Closer); ok {
+			_ = closer.Close()
+		}
+		err = ctx.Err()
+	}
 	if err == nil && len(data) > maxBytes {
 		err = errors.New("input exceeds 64 MiB")
 	}

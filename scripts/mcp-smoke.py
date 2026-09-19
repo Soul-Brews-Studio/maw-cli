@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke the compiled Go CLI against owned, temporary stdio subprocesses."""
 import json
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -63,5 +64,19 @@ with tempfile.TemporaryDirectory(prefix="maw-mcp-smoke-") as temporary:
     check(any(event.get("method") == "notifications/cancelled" for event in events), "request cancellation not sent")
     result, _ = run("slow-close")
     check(result.returncode == 0, "ordinary delayed EOF cleanup failed: " + result.stderr)
+
+# Go installs a signal context: stdin indexing must observe it even while blocked.
+blocked = subprocess.Popen([str(BINARY), "index", "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+time.sleep(0.1)
+blocked.send_signal(signal.SIGINT)
+try:
+    blocked.wait(timeout=3)
+finally:
+    if blocked.poll() is None:
+        blocked.kill()
+        blocked.wait()
+check(blocked.returncode != 0, "blocked stdin interrupt must fail")
+blocked.stdin.close()
+check(not blocked.stdout.read(), "interrupted index emitted summary")
 
 print("MCP smoke: actual CLI handshake, paging, trace persistence, errors, timeout, inert help, and cleanup OK")

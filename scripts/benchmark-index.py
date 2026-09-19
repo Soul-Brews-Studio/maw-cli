@@ -9,8 +9,8 @@ import os
 import platform
 import statistics
 import subprocess
+import sys
 import tempfile
-import time
 from pathlib import Path
 
 import benchmark as common
@@ -21,22 +21,48 @@ contract = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(contract)
 
 
+# A fresh exec removes the corpus/oracle's resident pages before the worker forks
+# a CLI. Linux wait4 otherwise includes the large parent's pre-exec RSS floor.
+# Keep this worker independent of the corpus, oracle, and benchmark imports.
+MEASUREMENT_WORKER = r"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+
+scale = 1 if sys.platform == "darwin" else 1024
+baseline = subprocess.Popen(["/usr/bin/true"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+_, status, baseline_usage = os.wait4(baseline.pid, 0)
+baseline.returncode = os.waitstatus_to_exitcode(status)
+if baseline.returncode:
+    raise RuntimeError("measurement baseline failed")
+with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+    started = time.perf_counter_ns()
+    process = subprocess.Popen(sys.argv[1:], stdout=stdout, stderr=stderr)
+    _, status, usage = os.wait4(process.pid, 0)
+    wall_ms = (time.perf_counter_ns() - started) / 1_000_000
+    process.returncode = os.waitstatus_to_exitcode(status)
+    stdout.seek(0)
+    stderr.seek(0)
+    print(json.dumps(dict(returncode=process.returncode,
+        stdout=stdout.read().decode("utf-8", errors="replace"),
+        stderr=stderr.read().decode("utf-8", errors="replace"),
+        sample=dict(wall_ms=wall_ms, user_ms=usage.ru_utime * 1000,
+                    system_ms=usage.ru_stime * 1000, peak_rss_bytes=usage.ru_maxrss * scale,
+                    launcher_baseline_peak_rss_bytes=baseline_usage.ru_maxrss * scale))))
+"""
+
+
 def measure(command, env, expected):
-    # wait4 gives this exact child's CPU/RSS, unlike cumulative RUSAGE_CHILDREN.
-    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
-        started = time.perf_counter_ns()
-        process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=stdout, stderr=stderr)
-        _, status, usage = os.wait4(process.pid, 0)
-        wall_ms = (time.perf_counter_ns() - started) / 1_000_000
-        process.returncode = os.waitstatus_to_exitcode(status)
-        stdout.seek(0)
-        stderr.seek(0)
-        if process.returncode:
-            raise RuntimeError(f"index failed ({process.returncode}): {stderr.read().decode(errors='replace')}")
-        contract.check_output(stdout.read(), expected)
-    rss_bytes = usage.ru_maxrss if platform.system() == "Darwin" else usage.ru_maxrss * 1024
-    return dict(wall_ms=wall_ms, user_ms=usage.ru_utime * 1000,
-                system_ms=usage.ru_stime * 1000, peak_rss_bytes=rss_bytes)
+    completed = subprocess.run([sys.executable, "-c", MEASUREMENT_WORKER, *command],
+                               cwd=ROOT, env=env, capture_output=True, check=True)
+    result = json.loads(completed.stdout)
+    if result["returncode"]:
+        raise RuntimeError(f"index failed ({result['returncode']}): {result['stderr']}")
+    contract.check_output(result["stdout"], expected)
+    return result["sample"]
 
 
 def corpus(count):
@@ -83,8 +109,8 @@ def main():
                   python=platform.python_version(), samples=args.samples, warmups=args.warmups,
                   corpus=dict(label="generated normalized MCP context results; not private transcripts", records=args.records,
                               bytes=len(data), sha256=hashlib.sha256(data).hexdigest(), expected=expected),
-                  method="rotating round-robin, fresh index process per sample, warm filesystem cache; wait4 per child CPU/RSS; every summary checked",
-                  limitations=["full input buffering allowed; actual postings retained", "not live MCP server throughput or transport latency", "not OS-cold measurements", "source lines are footprint, not time-to-prototype or productivity"], languages={})
+                  method="rotating round-robin, fresh index process per sample, warm filesystem cache; fresh small Python worker wait4 per child CPU/RSS (worker startup excluded); every summary checked",
+                  limitations=["full input buffering allowed; actual postings retained", "peak RSS includes a small measured Python-launcher fork floor; do not interpret values near launcher_baseline_peak_rss_bytes as pure executable memory", "not live MCP server throughput or transport latency", "not OS-cold measurements", "source lines are footprint, not time-to-prototype or productivity"], languages={})
     version_commands = {"go": [[common.tool("go"), "version"]] if "go" in languages else [],
                         "rs": [[common.tool("rustc"), "--version"], [common.tool("cargo"), "--version"]] if "rs" in languages else [],
                         "js": [[common.tool("bun"), "--version"]] if "js" in languages else [],
