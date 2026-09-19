@@ -7,6 +7,19 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 
 ## Lean Go CLI and shipping
 
+- Polyglot layout: `go/` is the core Go module, `rs/` the Rust port, `js/` the Bun
+  port, `zig/` the Zig port. These are independent implementations of the shared
+  CLI contract, not vendored maw-js/maw-rs repositories. Keep manifests/cache/output
+  isolated, and validate the same actual-process smoke fixture across ports.
+- `just dev all` builds/smokes all ports; `just <go|rs|js|zig> check` selects one.
+  `just bench run` measures startup; `just bench builds` includes build samples.
+  Do not report heavy MCP throughput or time-to-prototype measurements until
+  equivalent workloads and evidence exist. No synthetic numbers or language rankings.
+- After moves or branch switches, explicitly sync CodeGraph and verify a known
+  symbol: `status` can say no changes even when transient checkout events removed
+  symbols. Serena's live project config can also remain cached; persisted config
+  plus a fresh verified MCP connection is different from reloading the old one.
+
 - Start with a small, standard-library-only `maw` host. Commands share registry
   metadata for help and dispatch; operational features belong in separate plugins.
 - Compile first, then smoke-call the actual CLI. Unit tests are deferred until

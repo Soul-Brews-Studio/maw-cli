@@ -1,5 +1,8 @@
 # Lean maw CLI: scope and acceptance
 
+Historical bootstrap scope (issue #1, shipped in PR #2). The current directory
+layout and port/benchmark work are in [monorepo-plan.md](monorepo-plan.md).
+
 ## Goal
 
 Build a dependency-free Go CLI named `maw`, runnable from this GitHub module.
