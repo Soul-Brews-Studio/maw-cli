@@ -1,0 +1,8 @@
+# Learned sources live outside this repository
+ψ/learn/**/origin
+
+# Local build and navigation artifacts
+/bin/
+/dist/
+/.codegraph/
+__pycache__/
