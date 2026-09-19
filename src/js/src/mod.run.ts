@@ -1,5 +1,6 @@
 import { discover } from "./mod.discover";
 import { execute } from "./mod.execute";
+import { executeInstalled } from "./mod.executeInstalled";
 import { fail } from "./mod.fail";
 import { unknown } from "./mod.unknown";
 import { rootHelp } from "./mod.rootHelp";
@@ -35,7 +36,7 @@ export async function run(args: string[]): Promise<number> {
   if (name === "-h" || name === "--help") name = "help";
   if (name === "-v" || name === "--version") name = "version";
   const command = registry.get(name);
-  if (!command) return unknown(args[0]);
+  if (!command) return (await executeInstalled(name, args.slice(1))) ?? unknown(args[0]);
   if (!command.path && args.length === 2 && ["-h", "--help"].includes(args[1])) return help(registry, [name]);
   return command.run(args.slice(1));
 }

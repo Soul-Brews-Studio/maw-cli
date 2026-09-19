@@ -10,6 +10,7 @@ import (
 
 	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/command"
 	_ "github.com/Soul-Brews-Studio/maw-cli/src/go/internal/commands"
+	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/commands/plugins"
 )
 
 // Run executes one command. External plugin arguments are never parsed.
@@ -33,6 +34,9 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	base.Execute = func(ctx context.Context, name string, args []string) int {
 		meta, exists := metadata[name]
 		if !exists {
+			if code, found := plugins.ExecuteInstalled(ctx, name, args, stdin, stdout, stderr); found {
+				return code
+			}
 			return base.Fail(fmt.Sprintf("unknown command %q; run 'maw help'", name))
 		}
 		if meta.Path != "" {

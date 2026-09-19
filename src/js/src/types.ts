@@ -9,4 +9,5 @@ export type Command = {
 export type InstalledPlugin = {
   name: string; version: string; tier: "core" | "standard" | "extra";
   dir: string; enabled: boolean; cli: boolean; api: boolean; missing: boolean;
+  command: string; entry: string; runtime: string; target: string; interactive: boolean;
 };

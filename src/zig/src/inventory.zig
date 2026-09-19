@@ -2,7 +2,7 @@ const std = @import("std");
 const V = std.json.Value;
 const Object = std.json.ObjectMap;
 const tiers = [_][]const u8{ "core", "standard", "extra" };
-const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool };
+const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool, command: []const u8, runtime: []const u8, target: []const u8, interactive: bool, entry: []const u8 };
 const Config = struct { path: []const u8, name: []const u8, weight: []const u8, local: bool };
 const Context = struct {
     a: std.mem.Allocator,
@@ -137,7 +137,17 @@ const Context = struct {
         }
         if (entry.len == 0) entry = string(m, "wasm");
         const cli = isObject(m.get("cli")) or entry.len > 0;
-        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(try c.join(&.{ dir, entry })) };
+        var command: []const u8 = "";
+        var interactive = false;
+        if (m.get("cli")) |value| {
+            if (value == .object) {
+                command = string(value.object, "command");
+                if (command.len == 0) command = name;
+                if (value.object.get("interactive")) |flag| interactive = flag == .bool and flag.bool;
+            }
+        }
+        const absolute_entry = if (entry.len == 0) "" else try c.join(&.{ dir, entry });
+        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(absolute_entry), .command = command, .runtime = string(m, "runtime"), .target = string(m, "target"), .interactive = interactive, .entry = absolute_entry };
     }
     fn scan(c: Context, root: []const u8, off: std.StringHashMap(void)) ![]Plugin {
         const overrides = (try c.read(try c.join(&.{ root, ".overrides.json" }))) orelse Object.empty;
@@ -259,4 +269,65 @@ fn execute(c: Context, verbose: bool, all: bool) !u8 {
     const plugins = try c.scan(locations.plugins, off);
     try c.render(plugins, verbose, all);
     return 0;
+}
+
+pub const Dispatch = union(enum) { failure: u8, argv: []const []const u8 };
+
+pub fn resolve(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ.Map, name: []const u8, args: []const []const u8) !?Dispatch {
+    if (name.len == 0 or name[0] < 'a' or name[0] > 'z') return null;
+    for (name) |b| {
+        if (!((b >= 'a' and b <= 'z') or std.ascii.isDigit(b) or b == '-')) return null;
+    }
+    for ([_][]const u8{ "go", "rs", "js", "zig", "index" }) |reserved| {
+        if (eql(name, reserved)) return null;
+    }
+    const c = Context{ .a = a, .io = io, .env = env };
+    return resolveInstalled(c, name, args) catch |err| {
+        try c.out(.stderr(), "maw: plugin inventory: {s}\n", .{@errorName(err)});
+        return Dispatch{ .failure = 1 };
+    };
+}
+
+fn resolveInstalled(c: Context, name: []const u8, args: []const []const u8) !?Dispatch {
+    const locations = try c.paths();
+    const off = try c.disabled(locations.config);
+    for (try c.scan(locations.plugins, off)) |p| {
+        if (!eql(p.command, name)) continue;
+        if (!p.enabled) {
+            try c.out(.stderr(), "maw: plugin {s} is disabled\n", .{p.name});
+            return Dispatch{ .failure = 1 };
+        }
+        if (!eql(p.runtime, "bun-dev") or !eql(p.target, "js") or !p.interactive) {
+            try c.out(.stderr(), "maw: plugin {s} is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)\n", .{p.name});
+            return Dispatch{ .failure = 126 };
+        }
+        if (p.entry.len == 0 or !c.regular(p.entry)) {
+            try c.out(.stderr(), "maw: plugin {s} entry is missing or not a regular file\n", .{p.name});
+            return Dispatch{ .failure = 126 };
+        }
+        const bun = try findBun(c) orelse {
+            try c.out(.stderr(), "maw: plugin {s} requires bun on PATH\n", .{p.name});
+            return Dispatch{ .failure = 126 };
+        };
+        const argv = try c.a.alloc([]const u8, args.len + 2);
+        argv[0] = bun;
+        argv[1] = p.entry;
+        @memcpy(argv[2..], args);
+        return Dispatch{ .argv = argv };
+    }
+    return null;
+}
+
+fn findBun(c: Context) !?[]const u8 {
+    var paths = std.mem.splitScalar(u8, c.envOr("PATH", ""), std.fs.path.delimiter);
+    while (paths.next()) |directory| {
+        if (!std.fs.path.isAbsolute(directory)) continue;
+        const path = try c.join(&.{ directory, if (@import("builtin").os.tag == .windows) "bun.exe" else "bun" });
+        if (!c.regular(path)) continue;
+        if (@import("builtin").os.tag != .windows) {
+            std.Io.Dir.cwd().access(c.io, path, .{ .execute = true }) catch continue;
+        }
+        return path;
+    }
+    return null;
 }

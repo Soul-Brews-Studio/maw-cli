@@ -123,6 +123,8 @@ printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin ar
 
 if [ -n "$entry" ]; then
     python3 utils/scripts/plugin-smoke.py -- "$maw" "$entry"
+    python3 utils/scripts/dispatch-smoke.py -- "$maw" "$entry"
 else
     python3 utils/scripts/plugin-smoke.py -- "$maw"
+    python3 utils/scripts/dispatch-smoke.py -- "$maw"
 fi

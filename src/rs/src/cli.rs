@@ -43,7 +43,10 @@ fn help(registry: &Registry, args: &[OsString]) -> i32 {
                 0
             }
         },
-        None => unknown(&args[0]),
+        None => {
+            crate::inventory::execute(args[0].to_str().unwrap_or(""), &[OsString::from("--help")])
+                .unwrap_or_else(|| unknown(&args[0]))
+        }
     }
 }
 
@@ -93,7 +96,9 @@ pub fn run(args: Vec<OsString>) -> i32 {
     };
     let command = match registry.get(name) {
         Some(command) => command,
-        None => return unknown(&args[0]),
+        None => {
+            return crate::inventory::execute(name, &args[1..]).unwrap_or_else(|| unknown(&args[0]))
+        }
     };
     if let Some(path) = &command.path {
         return plugins::execute(path, &args[1..]);

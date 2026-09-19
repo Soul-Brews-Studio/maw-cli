@@ -13,8 +13,10 @@ import (
 )
 
 type installed struct {
-	Name, Version, Tier, Dir   string
-	Enabled, CLI, API, Missing bool
+	Name, Version, Tier, Dir        string
+	Command, Runtime, Target, Entry string
+	Interactive                     bool
+	Enabled, CLI, API, Missing      bool
 }
 
 func safePath(path string) string {
@@ -178,11 +180,21 @@ func scanInstalled(root string, disabled map[string]bool, stderr io.Writer) ([]i
 			executable = stringField(m, "wasm")
 		}
 		p := installed{Name: name, Version: version, Tier: tier, Dir: dir, Enabled: !disabled[name], CLI: objectField(m, "cli") != nil || executable != "", API: objectField(m, "api") != nil}
+		cli := objectField(m, "cli")
+		if cli != nil {
+			p.Command = stringField(cli, "command")
+			if p.Command == "" {
+				p.Command = name
+			}
+			p.Interactive, _ = cli["interactive"].(bool)
+		}
+		p.Runtime, p.Target = stringField(m, "runtime"), stringField(m, "target")
 		p.Missing = p.CLI && executable == ""
 		if executable != "" {
 			if !filepath.IsAbs(executable) {
 				executable = filepath.Join(dir, executable)
 			}
+			p.Entry = filepath.Clean(executable)
 			stat, err := os.Stat(executable)
 			p.Missing = err != nil || !stat.Mode().IsRegular()
 		}

@@ -161,6 +161,28 @@ not whether plugins are safe or runnable. See the [inventory contract](docs/inst
 Built-ins and PATH commands remain visible in `help`. No installation or state
 changes are included.
 
+### Run an installed CLI plugin
+
+With [maw-herdr-plugin](https://github.com/Soul-Brews-Studio/maw-herdr-plugin)
+already installed and `bun` on PATH:
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js herdr
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js herdr ls
+maw-go herdr help       # also maw-rs, maw-js, maw-zig
+```
+
+All four hosts launch standalone Bun plugins declaring `runtime: "bun-dev"`,
+`target: "js"`, and `cli.interactive: true`. Disabled plugins are not launched.
+Built-ins win first, then `maw-<command>` on PATH, then installed CLI metadata.
+The plugin runs as a child with your terminal, arguments, environment and working
+directory; **this is not a sandbox**. Native hosts also need `bun` to run these
+JS plugins. Herdr operations additionally need the `herdr` binary on PATH.
+Handler-module/WASM plugins and plugin installation are not implemented.
+See [dispatch rules](docs/plugins.md#installed-standalone-bun-clis).
+If `#alpha` serves an old cached CLI, use the [fresh-fetch recipe](#run-maw)
+or pin a commit containing installed-plugin dispatch.
+
 All ports provide `help`, `version`, `plugin ls`, and external `maw <plugin> [args...]`.
 The former benchmark-only `index` command has been removed. Go also provides
 [`context`](docs/mcp.md) through local Serena and CodeGraph MCP servers. Plugins

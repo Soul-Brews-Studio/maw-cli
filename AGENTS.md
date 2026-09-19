@@ -78,6 +78,14 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   Never execute `plugin.ts`, load entrypoints, migrate config or modify plugin
   state while listing. PATH dispatch remains separate with builtin collision
   protection; do not add plugin management operations implicitly.
+- Installed command dispatch is a separate, explicit subprocess operation after
+  builtin/PATH lookup. Reuse inventory selection and disabled state. Only standalone
+  Bun scripts declaring `runtime=bun-dev`, `target=js`, `cli.interactive=true` are
+  supported; do not silently import handler modules or add WASM/management support.
+  All ports resolve external Bun from absolute PATH directories, preserve argv,
+  streams and cwd, and fail clearly for disabled/unsupported/missing entries.
+  Root help/list stays inert; explicit `help <installed>` forwards `--help`.
+  Preserve the shared actual-process dispatch smoke, including terminal stdin.
 - The `index` CLI was removed entirely at the user's request, not hidden. Do not
   restore it or its benchmark/smoke tasks implicitly. The separately approved
   metadata JSON parser must not restore trace-index functionality.

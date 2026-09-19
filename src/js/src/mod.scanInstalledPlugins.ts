@@ -40,7 +40,13 @@ export function scanInstalledPlugins(root: string, disabled: Set<string>): Insta
       const api = !!m.api && typeof m.api === "object" && !Array.isArray(m.api);
       let missing = cli && !path;
       if (path) { try { missing = !statSync(resolve(dir, path)).isFile(); } catch { missing = true; } }
-      found.set(m.name, { name: m.name, version: m.version, tier, dir, enabled: !disabled.has(m.name), cli, api, missing });
+      const cliConfig = m.cli && typeof m.cli === "object" && !Array.isArray(m.cli) ? m.cli as Record<string, unknown> : null;
+      found.set(m.name, {
+        name: m.name, version: m.version, tier, dir, enabled: !disabled.has(m.name), cli, api, missing,
+        command: cliConfig ? (typeof cliConfig.command === "string" && cliConfig.command ? cliConfig.command : m.name) : "",
+        entry: path ? resolve(dir, path) : "", runtime: typeof m.runtime === "string" ? m.runtime : "",
+        target: typeof m.target === "string" ? m.target : "", interactive: cliConfig?.interactive === true,
+      });
     } catch { console.error(`maw: skipped invalid plugin.json: ${safePath(dir)}`); }
   }
   return [...found.values()].sort((a, b) => ["core", "standard", "extra"].indexOf(a.tier) - ["core", "standard", "extra"].indexOf(b.tier) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

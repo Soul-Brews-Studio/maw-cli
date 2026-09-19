@@ -12,6 +12,7 @@
 | `maw plugin ls --all` | Include disabled plugins |
 | `maw plugins`, `maw plugins ls` | Compatibility aliases for `maw plugin ls` |
 | `maw <external> [args...]` | Run a discovered `maw-<external>` executable |
+| `maw <installed> [args...]` | Fall back to an installed standalone Bun CLI |
 
 ## Installed metadata versus executable commands
 
@@ -20,6 +21,46 @@ Listing reads the global plugin inventory, normally `~/.maw/plugins`, using
 host's built-ins or PATH command catalog. See [inventory rules and limits](installed-plugin-listing.md)
 for path overrides, config precedence, TypeScript-only manifests and health.
 All aliases have the same behavior. No plugin/config state is changed.
+
+## Installed standalone Bun CLIs
+
+When a name is not a registered built-in or PATH command, all four hosts use the
+same global JSON inventory and disabled-plugin configuration as `plugin ls`.
+An installed CLI is selected by nonempty string `cli.command`, otherwise its
+manifest `name`; `cli` must be an object. Command names must match
+`[a-z][a-z0-9-]*`; `go`, `rs`, `js`, `zig` and removed `index` are excluded.
+For multiple manifests declaring one command, first in inventory tier/name order
+wins, including disabled or unsupported entries: never fall through to a shadow.
+
+The supported script ABI requires all three manifest declarations:
+
+```json
+{ "runtime": "bun-dev", "target": "js", "cli": { "command": "herdr", "interactive": true } }
+```
+
+Use the inventory's effective entry (`entry`, then non-WASM `artifact.path`,
+then `wasm`), normalized to an absolute path. The selected file must be regular.
+Find executable `bun` in absolute PATH directories (relative/empty entries are
+ignored), then spawn it with `[entry, ...args]` and inherited streams, environment
+and working directory. No import, shell interpolation, fetch or install step.
+The Bun host also uses external `bun`, not its own compiled executable as a runtime.
+Root help remains the built-in/PATH catalog; use `plugin ls` for installed names.
+Root help/list never execute entries. Explicit `help herdr` invokes the selected
+plugin with `--help`, just like `herdr --help`.
+
+Disabled plugins and unreadable/invalid configuration fail with **1** without
+execution. Unsupported ABI, missing entry or missing Bun fail with **126** and a
+diagnostic; no matching command retains unknown-command **2**. Other manifest
+validation/skipping follows the inventory contract. Explicit invocation runs
+trusted local code with your privileges; capability declarations, SDK versions
+and artifact hashes are **not enforced**. Installation is not a trust signature.
+These checks are not a race-proof sandbox against concurrent filesystem changes.
+
+This supports the standalone script in
+[maw-herdr-plugin at 93d4739](https://github.com/Soul-Brews-Studio/maw-herdr-plugin/tree/93d473919f31f97a4cf9bc7e3d8331b4b2a73c04),
+including its bundled `artifact.path` form. It is not a general compatibility
+layer for in-process handler exports or WASM. Herdr's operational verbs still
+require its own external tools/services; help succeeding does not prove all verbs.
 
 ## PATH command discovery and trust
 
