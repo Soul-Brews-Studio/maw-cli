@@ -34,8 +34,8 @@ pub fn discover(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]C
     try commands.appendSlice(allocator, &.{
         .{ .name = "help", .summary = "Show command help", .usage = "maw help [command]", .kind = .help },
         .{ .name = "version", .summary = "Show maw version", .usage = "maw version", .kind = .version },
-        .{ .name = "plugin", .summary = "List commands and executable plugin paths", .usage = "maw plugin ls", .kind = .plugins },
-        .{ .name = "plugins", .summary = "Alias for plugin ls", .usage = "maw plugins [ls]", .kind = .plugins },
+        .{ .name = "plugin", .summary = "List installed plugin metadata", .usage = "maw plugin ls [-v|--verbose] [--all]", .kind = .plugins },
+        .{ .name = "plugins", .summary = "Alias for plugin ls", .usage = "maw plugins [ls] [-v|--verbose] [--all]", .kind = .plugins },
     });
     var paths = std.mem.splitScalar(u8, path, std.fs.path.delimiter);
     while (paths.next()) |directory| {

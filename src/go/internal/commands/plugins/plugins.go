@@ -16,22 +16,41 @@ func init() {
 }
 func (p *plugin) Metadata() command.Metadata {
 	if p.legacy {
-		return command.Metadata{Name: "plugins", Summary: "Alias for plugin ls", Usage: "maw plugins [ls]"}
+		return command.Metadata{Name: "plugins", Summary: "Alias for plugin ls", Usage: "maw plugins [ls] [-v|--verbose] [--all]"}
 	}
-	return command.Metadata{Name: "plugin", Summary: "List commands and executable plugin paths", Usage: "maw plugin ls"}
+	return command.Metadata{Name: "plugin", Summary: "List installed plugin metadata", Usage: "maw plugin ls [-v|--verbose] [--all]"}
 }
 func (*plugin) BindFlags(*flag.FlagSet) {}
 func (p *plugin) Run(_ context.Context, i *command.Invocation) int {
-	if !(len(i.Args) == 1 && i.Args[0] == "ls") && !(p.legacy && len(i.Args) == 0) {
+	args := i.Args
+	if len(args) > 0 && args[0] == "ls" {
+		args = args[1:]
+	} else if !p.legacy {
 		return i.Fail("usage: " + p.Metadata().Usage)
 	}
-	fmt.Fprintln(i.Stdout, "NAME\tTYPE\tPATH")
-	for _, cmd := range i.Commands {
-		kind, path := "builtin", "-"
-		if cmd.Path != "" {
-			kind, path = "external", cmd.Path
+	verbose, all := false, false
+	for _, arg := range args {
+		if (arg == "-v" || arg == "--verbose") && !verbose {
+			verbose = true
+		} else if arg == "--all" && !all {
+			all = true
+		} else {
+			return i.Fail("usage: " + p.Metadata().Usage)
 		}
-		fmt.Fprintf(i.Stdout, "%s\t%s\t%s\n", cmd.Name, kind, path)
 	}
-	return 0
+	root, config, err := paths()
+	if err == nil {
+		var disabled map[string]bool
+		disabled, err = disabledPlugins(config)
+		if err == nil {
+			var plugins []installed
+			plugins, err = scanInstalled(root, disabled, i.Stderr)
+			if err == nil {
+				render(i.Stdout, plugins, verbose, all)
+				return 0
+			}
+		}
+	}
+	fmt.Fprintf(i.Stderr, "maw: %s\n", err)
+	return 1
 }

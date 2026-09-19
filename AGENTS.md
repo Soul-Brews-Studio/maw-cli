@@ -24,8 +24,9 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 - Start with a small, standard-library-only Go `maw` host. Commands share registry
   metadata for help and dispatch; new built-ins use `CommandPlugin` packages with init-time factory registration.
   External executable plugins keep their separate process boundary.
-- Preserve Rust 1.69 compatibility. The former `serde_json` dependency was
-  removed with the index parser. No new runtime dependencies without approval.
+- Preserve Rust 1.69 compatibility. The user explicitly approved `serde_json`
+  for installed-plugin JSON metadata; keep its compatible transitive lockfile.
+  No other new runtime dependencies without approval.
 - Compile first, then smoke-call the actual CLI. Unit tests are deferred until
   the user explicitly requests them. Do not add test frameworks. The user authorized automatic alpha prereleases and prebuilt uploads on 2026-09-19;
   publish only after verified same-repository alpha CI and complete native build smokes.
@@ -71,10 +72,15 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   as the small executable entrypoint and shared declarations in `types.ts`.
 
 - The public listing command is `plugin ls`; accept `plugins ls` and legacy
-  `plugins` as equivalent aliases. Listing is inert and protects built-in names
-  from PATH collisions. Do not add plugin management operations implicitly.
+  `plugins` as equivalent aliases. They inventory global installed `plugin.json`
+  metadata (not built-ins or PATH commands); `-v`/`--verbose` shows rows and
+  `--all` includes disabled entries. Follow docs/installed-plugin-listing.md.
+  Never execute `plugin.ts`, load entrypoints, migrate config or modify plugin
+  state while listing. PATH dispatch remains separate with builtin collision
+  protection; do not add plugin management operations implicitly.
 - The `index` CLI was removed entirely at the user's request, not hidden. Do not
-  restore it, its parser dependencies, or its benchmark/smoke tasks implicitly.
+  restore it or its benchmark/smoke tasks implicitly. The separately approved
+  metadata JSON parser must not restore trace-index functionality.
   Serena/CodeGraph indexing and Relic history indexing remain separate and active.
 
 ## Serena MCP: indexing and understanding

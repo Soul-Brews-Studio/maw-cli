@@ -54,10 +54,14 @@ pub fn run(args: Vec<OsString>) -> i32 {
         ("version", "Show maw version", "maw version"),
         (
             "plugin",
-            "List commands and executable plugin paths",
-            "maw plugin ls",
+            "List installed plugin metadata",
+            "maw plugin ls [-v|--verbose] [--all]",
         ),
-        ("plugins", "Alias for plugin ls", "maw plugins [ls]"),
+        (
+            "plugins",
+            "Alias for plugin ls",
+            "maw plugins [ls] [-v|--verbose] [--all]",
+        ),
     ] {
         registry.insert(
             name.to_owned(),
@@ -100,24 +104,12 @@ pub fn run(args: Vec<OsString>) -> i32 {
     if name == "help" {
         return help(&registry, &args[1..]);
     }
-    let valid_args = if name == "plugin" || name == "plugins" {
-        (args.len() == 2 && args[1] == "ls") || (name == "plugins" && args.len() == 1)
-    } else {
-        args.len() == 1
-    };
-    if !valid_args {
+    if name == "plugin" || name == "plugins" {
+        return crate::inventory::run(&args[1..], name == "plugins");
+    }
+    if args.len() != 1 {
         return fail(&format!("usage: {}", command.usage));
     }
-    if name == "version" {
-        println!("maw {}", option_env!("MAW_VERSION").unwrap_or("dev"));
-    } else {
-        println!("NAME\tTYPE\tPATH");
-        for (name, command) in &registry {
-            match &command.path {
-                Some(path) => println!("{}\texternal\t{}", name, path.display()),
-                None => println!("{}\tbuiltin\t-", name),
-            }
-        }
-    }
+    println!("maw {}", option_env!("MAW_VERSION").unwrap_or("dev"));
     0
 }

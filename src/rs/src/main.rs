@@ -1,4 +1,5 @@
 mod cli;
+mod inventory;
 mod plugins;
 
 fn main() {

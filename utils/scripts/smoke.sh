@@ -39,9 +39,9 @@ export MAW_SMOKE_MARKER
 # Isolate discovery from any real, potentially operational local plugins.
 run() {
     if [ -n "$entry" ]; then
-        PATH="$tmp/plugins" "$maw" "$entry" "$@"
+        HOME="$tmp/home" MAW_HOME="$tmp/home/.maw" MAW_PLUGINS_DIR="$tmp/home/.maw/plugins" PATH="$tmp/plugins" "$maw" "$entry" "$@"
     else
-        PATH="$tmp/plugins" "$maw" "$@"
+        HOME="$tmp/home" MAW_HOME="$tmp/home/.maw" MAW_PLUGINS_DIR="$tmp/home/.maw/plugins" PATH="$tmp/plugins" "$maw" "$@"
     fi
 }
 run > "$tmp/default"
@@ -52,13 +52,12 @@ grep -q 'probe' "$tmp/help"
 run version > "$tmp/version"
 grep -q '^maw .' "$tmp/version"
 run plugins > "$tmp/plugins-list"
-grep -q 'probe.*external' "$tmp/plugins-list"
+grep -q '^no plugins installed$' "$tmp/plugins-list"
 run plugin ls > "$tmp/plugin-ls"
 run plugins ls > "$tmp/plugins-ls"
 cmp "$tmp/plugins-list" "$tmp/plugin-ls"
 cmp "$tmp/plugins-list" "$tmp/plugins-ls"
-grep -q '^plugin[[:space:]].*builtin' "$tmp/plugin-ls"
-grep -q '^plugins[[:space:]].*builtin' "$tmp/plugin-ls"
+[ ! -e "$tmp/home" ] || fail 'listing created plugin/config directories'
 grep -q '^  plugin[[:space:]]' "$tmp/help"
 if grep -q '^  index[[:space:]]' "$tmp/help" || grep -q '^index[[:space:]]' "$tmp/plugin-ls"; then
     fail 'removed index command leaked into help/listing'
@@ -121,3 +120,9 @@ printf 'hello stdin\n' | run probe 'two words' '' '*.go' > "$tmp/out" 2> "$tmp/e
 grep -q '^stdin=hello stdin$' "$tmp/out"
 grep -q '^probe stderr$' "$tmp/err"
 printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin argv/streams/exit OK\n'
+
+if [ -n "$entry" ]; then
+    python3 utils/scripts/plugin-smoke.py -- "$maw" "$entry"
+else
+    python3 utils/scripts/plugin-smoke.py -- "$maw"
+fi

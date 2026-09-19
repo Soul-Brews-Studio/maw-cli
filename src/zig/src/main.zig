@@ -1,11 +1,13 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const registry = @import("registry.zig");
+const inventory = @import("inventory.zig");
 
 const Host = struct {
     allocator: std.mem.Allocator,
     io: std.Io,
     commands: []const registry.Command,
+    env: *const std.process.Environ.Map,
 
     fn output(self: Host, file: std.Io.File, comptime format: []const u8, args: anytype) !void {
         const text = try std.fmt.allocPrint(self.allocator, format, args);
@@ -74,17 +76,7 @@ const Host = struct {
                 if (args.len != 1) return self.fail("usage: maw version");
                 try self.output(.stdout(), "maw {s}\n", .{build_options.version});
             },
-            .plugins => {
-                const legacy = eql(name, "plugins");
-                if (!(args.len == 2 and eql(args[1], "ls")) and !(legacy and args.len == 1)) {
-                    return self.fail(if (legacy) "usage: maw plugins [ls]" else "usage: maw plugin ls");
-                }
-                try self.output(.stdout(), "NAME\tTYPE\tPATH\n", .{});
-                for (self.commands) |entry| {
-                    const external = entry.kind == .external;
-                    try self.output(.stdout(), "{s}\t{s}\t{s}\n", .{ entry.name, if (external) "external" else "builtin", if (external) entry.path else "-" });
-                }
-            },
+            .plugins => return inventory.run(self.allocator, self.io, self.env, args[1..], eql(name, "plugins")),
         }
         return 0;
     }
@@ -100,6 +92,7 @@ pub fn main(init: std.process.Init) !void {
     const host: Host = .{
         .allocator = allocator,
         .io = init.io,
+        .env = init.environ_map,
         .commands = try registry.discover(allocator, init.io, init.environ_map.get("PATH") orelse ""),
     };
     std.process.exit(try host.run(args[1..]));

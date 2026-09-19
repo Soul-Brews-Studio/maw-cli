@@ -1,14 +1,26 @@
 import { fail } from "./mod.fail";
-import { sorted } from "./mod.sorted";
-import type { Command } from "./types";
+import { inventoryPaths } from "./mod.inventoryPaths";
+import { disabledPlugins } from "./mod.disabledPlugins";
+import { scanInstalledPlugins } from "./mod.scanInstalledPlugins";
+import { formatPluginInventory } from "./mod.formatPluginInventory";
 
-export function listPlugins(registry: Map<string, Command>, args: string[], legacy = false): number {
-  if (!(args.length === 1 && args[0] === "ls") && !(legacy && args.length === 0)) {
-    return fail(legacy ? "usage: maw plugins [ls]" : "usage: maw plugin ls");
+export function listPlugins(args: string[], legacy = false): number {
+  let flags = args;
+  if (args[0] === "ls") flags = args.slice(1);
+  else if (!legacy) return fail("usage: maw plugin ls [-v|--verbose] [--all]");
+  let verbose = false, all = false;
+  for (const arg of flags) {
+    if ((arg === "-v" || arg === "--verbose") && !verbose) verbose = true;
+    else if (arg === "--all" && !all) all = true;
+    else return fail(`usage: maw ${legacy ? "plugins [ls]" : "plugin ls"} [-v|--verbose] [--all]`);
   }
-  console.log("NAME\tTYPE\tPATH");
-  for (const command of sorted(registry)) {
-    console.log(`${command.name}\t${command.path ? "external" : "builtin"}\t${command.path ?? "-"}`);
+  try {
+    const paths = inventoryPaths();
+    const plugins = scanInstalledPlugins(paths.plugins, disabledPlugins(paths.config));
+    process.stdout.write(formatPluginInventory(plugins, verbose, all));
+    return 0;
+  } catch (error) {
+    console.error(`maw: ${(error as Error).message}`);
+    return 1;
   }
-  return 0;
 }
