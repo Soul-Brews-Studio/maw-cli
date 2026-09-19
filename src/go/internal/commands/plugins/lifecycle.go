@@ -16,7 +16,7 @@ var safeRef = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 func lifecycle(ctx context.Context, i *command.Invocation) int {
 	args := i.Args
-	usage := "usage: maw plugin install SOURCE [--ref REF] | update NAME [--ref REF] | info|check NAME"
+	usage := "usage: maw plugin install SOURCE[@REF|#REF] [--ref REF] | update NAME[@REF|#REF] [--ref REF] | info|check NAME"
 	if len(args) != 2 && len(args) != 4 {
 		return i.Fail(usage)
 	}
@@ -26,6 +26,22 @@ func lifecycle(ctx context.Context, i *command.Invocation) int {
 			return i.Fail(usage)
 		}
 		ref = args[3]
+	}
+	if args[0] == "install" || args[0] == "update" {
+		name, selector, err := pluginSelector(args[1], args[0] == "install")
+		if err != nil {
+			return i.Fail(err.Error())
+		}
+		if selector != "" {
+			if ref != "" {
+				return i.Fail("ref supplied twice")
+			}
+			ref = selector
+			args = []string{args[0], name, "--ref", ref}
+			copy := *i
+			copy.Args = args
+			i = &copy
+		}
 	}
 	root, _, err := paths()
 	if err == nil {
@@ -55,12 +71,6 @@ func installGitPlugin(ctx context.Context, root, source, ref string, i *command.
 		source = herdrRepository
 	}
 	if !strings.HasPrefix(source, "https://") {
-		if at := strings.LastIndex(source, "@"); at > 0 && !filepath.IsAbs(source) {
-			if ref != "" {
-				return fmt.Errorf("ref supplied twice")
-			}
-			ref, source = source[at+1:], source[:at]
-		}
 		if info, err := os.Stat(source); err == nil && info.IsDir() {
 			source, err = filepath.Abs(source)
 			if err != nil {

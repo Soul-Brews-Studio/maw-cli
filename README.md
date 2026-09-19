@@ -5,8 +5,9 @@ Modular built-ins and external executable plugins; no tmux service or agent engi
 
 ## Run maw
 
-Choose one implementation. Go adds the `context` MCP command; the four ports
-otherwise share the help/version/plugin contract.
+Choose one implementation. Go adds `context`, verified self-`update`, detailed
+marketplace rows and plugin `@`/`#` selectors. All ports share the basic
+help/version/plugin contract.
 
 ### Prebuilt: no compiler or runtime
 
@@ -87,6 +88,23 @@ go install github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha
 **Check for an existing `maw-go` before installing.** Set `GOBIN` to a separate
 absolute directory to avoid replacing it. Otherwise Go installs into its default
 binary directory, normally `$(go env GOPATH)/bin`; add that directory to PATH.
+
+### Update the Go host
+
+```sh
+maw-go update --check                     # current version, release tag and commit
+maw-go update                             # latest published alpha, not the alpha branch
+maw-go update --version v26.9.19-alpha.1547 # explicit published tag; can downgrade
+```
+
+An older installation without `update` needs one more `go install ...@alpha`
+using the full path above. Self-update supports native Go-installed/prebuilt
+executables on Linux/macOS, amd64/arm64. It downloads the matching prebuilt,
+verifies checksums, metadata and its exact version, then replaces only the
+current executable. No Go compiler, curl, tar or Git is needed for self-update.
+Plugins/configuration stay untouched; other ports do not have this command yet.
+Local `dev`/`go run` builds can only `--check`. A newer source install waits for
+a published release instead of silently downgrading. [Update contract](docs/self-update.md).
 
 ### Local source: Bun, Rust and Zig
 
@@ -180,6 +198,25 @@ Use `maw-rs`, `maw-js`, or `maw-zig` for the same commands. From GitHub:
 ```sh
 bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js plugin install herdr
 ```
+
+Go marketplace rows add local `STATUS`, `VERSION`, `REF` and `COMMIT` columns.
+`not-installed` means absent; `installed`/`disabled` comes from the existing
+JSON inventory. `REF` is a local branch, exact tag or `detached`; `COMMIT` is
+the first 12 Git SHA characters. Unknown Git metadata is `-`, not a remote
+version guess. Listing never fetches; missing Git does not hide the installed
+manifest version. Invalid installations and unreadable Git metadata are reported.
+
+Go also accepts either Git selector spelling (quote arguments containing `#`):
+
+```sh
+maw-go plugin install 'Soul-Brews-Studio/maw-herdr-plugin@main'
+maw-go plugin update 'herdr#main'
+maw-go plugin update 'herdr@6318e0f7c56d9272656c804d990de35ab50557d6'
+```
+
+These are aliases for `--ref`, including HTTPS URLs. Do not combine both forms.
+Explicit refs pin the resolved commit; omit a selector for ordinary branch
+fast-forward updates. Other ports still use their existing `--ref` syntax.
 
 To pin a **new installation** to the merged Herdr serve commit instead:
 
