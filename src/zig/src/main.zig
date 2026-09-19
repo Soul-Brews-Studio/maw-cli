@@ -35,10 +35,18 @@ const Host = struct {
             return 0;
         }
         if (args.len != 1) return self.fail("usage: maw help [command]");
-        const command = registry.find(self.commands, args[0]) orelse return self.unknown(args[0]);
+        const command = registry.find(self.commands, args[0]) orelse return self.installed(args[0], &.{"--help"});
         if (command.kind == .external) return self.execute(command.path, &.{"--help"});
         try self.output(.stdout(), "Usage: {s}\n\n{s}\n", .{ command.usage, command.summary });
         return 0;
+    }
+
+    fn installed(self: Host, name: []const u8, args: []const []const u8) !u8 {
+        const result = try inventory.resolve(self.allocator, self.io, self.env, name, args) orelse return self.unknown(name);
+        return switch (result) {
+            .failure => |code| code,
+            .argv => |argv| self.execute(argv[0], argv[1..]),
+        };
     }
 
     fn execute(self: Host, path: []const u8, args: []const []const u8) !u8 {
@@ -67,7 +75,7 @@ const Host = struct {
         if ((help_flag or version_flag) and args.len != 1) return self.fail("global help/version flags do not accept arguments");
         if (help_flag) name = "help";
         if (version_flag) name = "version";
-        const command = registry.find(self.commands, name) orelse return self.unknown(name);
+        const command = registry.find(self.commands, name) orelse return self.installed(name, args[1..]);
         if (command.kind != .external and args.len == 2 and (eql(args[1], "-h") or eql(args[1], "--help"))) return self.help(&.{name});
         switch (command.kind) {
             .help => return self.help(args[1..]),

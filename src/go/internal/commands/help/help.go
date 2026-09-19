@@ -37,5 +37,5 @@ func (*plugin) Run(ctx context.Context, i *command.Invocation) int {
 		fmt.Fprintf(i.Stdout, "Usage: %s\n\n%s\n", cmd.Usage, cmd.Summary)
 		return 0
 	}
-	return i.Fail(fmt.Sprintf("unknown command %q; run 'maw help'", i.Args[0]))
+	return i.Execute(ctx, i.Args[0], []string{"--help"})
 }

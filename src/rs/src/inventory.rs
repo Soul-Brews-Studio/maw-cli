@@ -17,6 +17,11 @@ struct Plugin {
     cli: bool,
     api: bool,
     missing: bool,
+    command: String,
+    runtime: String,
+    target: String,
+    interactive: bool,
+    entry: Option<PathBuf>,
 }
 const TIERS: [&str; 3] = ["core", "standard", "extra"];
 
@@ -249,6 +254,22 @@ fn manifest(
     } else {
         !absolute(dir.join(entry)).ok()?.is_file()
     };
+    let cli_metadata = m.get("cli").and_then(Value::as_object);
+    let command = cli_metadata
+        .map(|cli| {
+            let command = text(cli, "command");
+            if command.is_empty() {
+                name
+            } else {
+                command
+            }
+        })
+        .unwrap_or("");
+    let entry = if entry.is_empty() {
+        None
+    } else {
+        Some(absolute(dir.join(entry)).ok()?)
+    };
     Some(Plugin {
         name: name.to_string(),
         version: version.to_string(),
@@ -258,6 +279,14 @@ fn manifest(
         cli,
         api,
         missing,
+        command: command.to_owned(),
+        runtime: text(m, "runtime").to_owned(),
+        target: text(m, "target").to_owned(),
+        interactive: cli_metadata
+            .and_then(|cli| cli.get("interactive"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        entry,
     })
 }
 fn scan(root: &Path, disabled: &BTreeSet<String>) -> Result<Vec<Plugin>> {
@@ -395,5 +424,80 @@ pub fn run(args: &[OsString], legacy: bool) -> i32 {
             eprintln!("maw: {}", e);
             1
         }
+    }
+}
+
+// Called only after builtin and PATH command lookup has failed.
+pub fn execute(name: &str, args: &[OsString]) -> Option<i32> {
+    if !name
+        .as_bytes()
+        .first()
+        .map_or(false, u8::is_ascii_lowercase)
+        || !name
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        || matches!(name, "go" | "rs" | "js" | "zig" | "index")
+    {
+        return None;
+    }
+    let inventory = paths().and_then(|(root, config)| {
+        disabled_plugins(&config).and_then(|disabled| scan(&root, &disabled))
+    });
+    let inventory = match inventory {
+        Ok(plugins) => plugins,
+        Err(e) => {
+            eprintln!("maw: {}", e);
+            return Some(1);
+        }
+    };
+    let plugin = inventory.into_iter().find(|p| p.command == name)?;
+    let fail = |code, reason| {
+        eprintln!("maw: plugin {} {}", plugin.name, reason);
+        Some(code)
+    };
+    if !plugin.enabled {
+        return fail(1, "is disabled");
+    }
+    if plugin.runtime != "bun-dev" || plugin.target != "js" || !plugin.interactive {
+        return fail(126, "is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)");
+    }
+    let entry = match plugin.entry.as_ref().filter(|path| path.is_file()) {
+        Some(entry) => entry,
+        None => return fail(126, "entry is missing or not a regular file"),
+    };
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let bun = std::env::split_paths(&path)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join(if cfg!(windows) { "bun.exe" } else { "bun" }))
+        .find(|path| {
+            let metadata = match path.metadata() {
+                Ok(m) if m.is_file() => m,
+                _ => return false,
+            };
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                metadata.permissions().mode() & 0o111 != 0
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = metadata;
+                true
+            }
+        });
+    let bun = match bun {
+        Some(bun) => bun,
+        None => return fail(126, "requires bun on PATH"),
+    };
+    match std::process::Command::new(&bun)
+        .arg(entry)
+        .args(args)
+        .status()
+    {
+        Ok(status) => Some(status.code().unwrap_or(126)),
+        Err(error) => fail(
+            126,
+            &format!("cannot execute bun {}: {}", display(&bun), error),
+        ),
     }
 }
