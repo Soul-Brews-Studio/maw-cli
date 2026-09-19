@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Soul-Brews-Studio/maw-herdr/src/go/internal/mcp"
+	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/mcp"
 )
 
 type configuration struct {

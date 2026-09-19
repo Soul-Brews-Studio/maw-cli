@@ -3,29 +3,78 @@
 Choose one implementation. Go adds the `context` MCP command; the four ports
 otherwise share the help/plugin/index contract.
 
+## Prebuilt: no compiler or runtime
+
+Open [Releases](https://github.com/Soul-Brews-Studio/maw-cli/releases), choose a
+published alpha tag, and download one archive plus `SHA256SUMS`:
+
+- Default Go: `maw-go-<os>-<arch>.tar.gz` (includes `context`).
+- Alternatives: `maw-rs-...`, `maw-js-...`, `maw-zig-...`.
+- `<os>`: `linux` or `darwin` (macOS); `<arch>`: `amd64` (x64) or `arm64`.
+
+In a new directory, verify your selected archive before extracting:
+
+```sh
+# Example: after downloading the Linux x64 Go archive and SHA256SUMS
+grep '  maw-go-linux-amd64.tar.gz$' SHA256SUMS | sha256sum -c -
+tar -xzf maw-go-linux-amd64.tar.gz
+./maw-go --help
+```
+
+On macOS, use `shasum -a 256 -c -` instead of `sha256sum -c -`. Every archive
+contains its language-named executable and `RELEASE.json`; extract into separate directories
+to keep their metadata alongside them.
+Bun's prebuilt embeds its runtime. Linux builds run on Ubuntu 24.04; older
+Linux/libc compatibility is not guaranteed. macOS binaries are not notarized.
+Use the source commands below if platform security or compatibility blocks a binary.
+A queued build is not a published download; alpha prereleases have no `/latest` alias.
+
+## Bun / bunx: run directly from GitHub
+
+Requires **Bun 1.3.11+**, no clone required:
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js --help
+```
+
+Use `#alpha`, not the browser URL `/tree/alpha`. Replace the fragment with an exact
+commit or published release tag to pin the source. This downloads the Git package,
+not a prebuilt binary or npm package. See [bunx](https://bun.com/docs/pm/bunx) and
+[Bun Git dependencies](https://bun.com/docs/pm/cli/add#git-dependencies).
+
+With npm/npx instead of an existing Bun install:
+
+```sh
+npx --yes --package=bun@1.3.11 -- bun x --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js --help
+```
+
+npx fetches Bun, then Bun runs the GitHub package; this is **not a native Node
+port**. `--yes` accepts npm's install prompt. No registry package named maw-cli
+is published. Both runners execute code with your user privileges.
+
 ## Go: run or install directly
 
 Requires Go **1.22+**. No clone or GitHub authentication is needed:
 
 ```sh
-go run github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw@alpha --help
+go run github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha --help
 ```
 
-To install an executable named `maw`:
+To install an executable named `maw-go`:
 
 ```sh
-go install github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw@alpha
+go install github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha
 ```
 
-**Check for an existing `maw` before installing.** Set `GOBIN` to a separate
+**Check for an existing `maw-go` before installing.** Set `GOBIN` to a separate
 absolute directory to avoid replacing it. Otherwise Go installs into its default
 binary directory, normally `$(go env GOPATH)/bin`; add that directory to PATH.
 
-## Bun, npx, Rust and Zig: clone first
+## Local source: Bun, Rust and Zig
 
 ```sh
-git clone --branch alpha https://github.com/Soul-Brews-Studio/maw-herdr.git
-cd maw-herdr
+git clone --branch alpha https://github.com/Soul-Brews-Studio/maw-cli.git
+cd maw-cli
 ```
 
 Run these commands from the repository root. You need only the selected runtime.
@@ -35,22 +84,6 @@ Run these commands from the repository root. You need only the selected runtime.
 ```sh
 bun src/js/src/cli.ts --help
 ```
-
-### bunx / npx: select Bun
-
-With bunx or npm/npx installed, choose one:
-
-```sh
-bunx --bun --package bun@1.3.11 bun src/js/src/cli.ts --help
-```
-
-```sh
-npx --yes --package=bun@1.3.11 -- bun src/js/src/cli.ts --help
-```
-
-Both commands fetch Bun and run the cloned TypeScript source, not a published
-maw package. The npx command is **not** a native Node implementation; `--yes`
-accepts npm's install prompt. Plain `bun` is simpler if you already have it.
 
 ### Rust 1.69+
 
@@ -65,34 +98,16 @@ cargo run --release --locked --manifest-path src/rs/Cargo.toml -- --help
 src/zig/zig-out/bin/maw-zig --help
 ```
 
-### Direct package runners
-
-| Runner | Direct maw package available? |
-| --- | --- |
-| `bunx` | No; the example above selects Bun, not maw |
-| `npx` | No; the example above installs Bun, not maw |
-
-See [bunx](https://bun.sh/docs/pm/bunx) and
-[npm exec](https://docs.npmjs.com/cli/v11/commands/npm-exec/) for runner behavior.
-
-The repository has no root `package.json`. `src/js/package.json` is private and
-has no `bin` entry. Direct runners need package metadata and an executable
-entrypoint; this repository is not packaged for that yet. Do not substitute an
-unrelated registry package with a similar name.
-
 ## Pin a version
 
-- `@alpha` is a moving Git branch, not an immutable release.
-- Go accepts an exact Git commit after `@`; source users can check out that commit.
-- Calendar-versioned alpha tags are possible, but **none are published yet**.
+- `@alpha` in Go and `#alpha` in Bun follow the moving Git branch.
+- An exact commit pins both runners without waiting for a release.
+- Published root tags use `vYY.M.D-alpha.HMM.CI_RUN_ID`; use them after `#` in Bun.
+- Go uses the release's companion version `v0.YYYYMMDD.HMM-alpha.CI_RUN_ID`,
+  shown in its downloadable `release.json`; put that version after `@`.
 
-For example, a future nested-module Git tag `src/go/v0.20260919.1020-alpha` would
-allow `@v0.20260919.1020-alpha` on the Go command path. This is a **proposed example,
-not a runnable released version**. A plain major-version `v26...` module tag would
-require a matching `/v26` module path; a repository CalVer label alone does not
-make the existing Go module installable at that semantic version.
-
-See [Go module versions](https://go.dev/ref/mod#versions),
-[nested-module tags](https://go.dev/ref/mod#vcs-version), and our
-[gated release workflow](release.md). No npm publication, tag or release is
-performed by these run commands.
+The Go Git tag is prefixed `src/go/`, but the install selector omits that prefix.
+The companion tag keeps the current Go module path valid, unlike a `v26...`
+major-version tag. `@latest` prefers stable versions; it does not mean the alpha
+branch. See [Go version/tag mapping](https://go.dev/ref/mod#vcs-version) and
+[release automation](release.md). Running a command does not publish a release.

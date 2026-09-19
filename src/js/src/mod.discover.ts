@@ -19,7 +19,7 @@ export function discover(): Map<string, string> {
       }
       if (!/^maw-[a-z][a-z0-9-]*$/.test(filename)) continue;
       const name = filename.slice(4);
-      if (plugins.has(name)) continue;
+      if (["go", "rs", "js", "zig"].includes(name) || plugins.has(name)) continue;
       try {
         const path = realpathSync(join(directory, entry));
         const info = statSync(path);
@@ -32,30 +32,4 @@ export function discover(): Map<string, string> {
     }
   }
   return plugins;
-}
-
-export async function execute(path: string, args: string[]): Promise<number> {
-  try {
-    const child = Bun.spawn([path, ...args], {
-      stdin: "inherit",
-      stdout: "inherit",
-      stderr: "inherit",
-      env: process.env,
-    });
-    let interrupted = false;
-    const interrupt = () => {
-      interrupted = true;
-      child.kill("SIGKILL");
-    };
-    process.on("SIGINT", interrupt);
-    try {
-      const code = await child.exited;
-      return interrupted ? 1 : child.signalCode ? 126 : code;
-    } finally {
-      process.off("SIGINT", interrupt);
-    }
-  } catch (error) {
-    console.error(`maw: cannot execute ${path}: ${error instanceof Error ? error.message : error}`);
-    return 126;
-  }
 }

@@ -9,5 +9,8 @@ pub fn build(b: *std.Build) void {
             .optimize = b.standardOptimizeOption(.{}),
         }),
     });
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", b.option([]const u8, "version", "Release version") orelse "dev");
+    exe.root_module.addOptions("build_options", options);
     b.installArtifact(exe);
 }

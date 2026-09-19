@@ -2,7 +2,7 @@ set working-directory := '../..'
 
 # Build core maw (maw-go is the comparison filename).
 build:
-    /usr/bin/time -p go -C src/go build -o ../../bin/maw-go ./cmd/maw
+    /usr/bin/time -p go -C src/go build -o ../../bin/maw-go ./cmd/maw-go
 
 smoke:
     /usr/bin/time -p sh utils/scripts/smoke.sh "$(pwd)/bin/maw-go"

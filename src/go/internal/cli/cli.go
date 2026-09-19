@@ -8,8 +8,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/Soul-Brews-Studio/maw-herdr/src/go/internal/command"
-	_ "github.com/Soul-Brews-Studio/maw-herdr/src/go/internal/commands"
+	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/command"
+	_ "github.com/Soul-Brews-Studio/maw-cli/src/go/internal/commands"
 )
 
 // Run executes one command. External plugin arguments are never parsed.

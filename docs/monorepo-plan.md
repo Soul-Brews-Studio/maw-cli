@@ -27,6 +27,6 @@ not a vendored copy or a full port of the external maw-js/maw-rs source projects
 
 Issue #3 -> focused commits on `feat/3-polyglot-cli` -> PR into `alpha` -> compile
 and smoke -> self-merge -> checkout/pull `alpha`. Verify the new Go remote command
-`go run github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw@alpha --help` after merge.
+`go run github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha --help` after merge.
 The old root-module command path is replaced in this unreleased alpha layout.
 Keep `$calver` a separate user handoff; no tag or release in this increment.

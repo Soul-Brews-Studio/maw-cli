@@ -38,8 +38,9 @@ jobs:
         run: |
           case "$MAW_LANGUAGE" in
             go)
+              python3 -m py_compile utils/scripts/release.py utils/scripts/build-release.py utils/scripts/package-smoke.py
               go version
-              /usr/bin/time -p go -C src/go build -o ../../bin/maw-go ./cmd/maw
+              /usr/bin/time -p go -C src/go build -o ../../bin/maw-go ./cmd/maw-go
               sh utils/scripts/smoke.sh "$PWD/bin/maw-go"
               go -C src/go vet ./...
               python3 utils/scripts/mcp-smoke.py "$PWD/bin/maw-go"
@@ -53,6 +54,7 @@ jobs:
               ;;
             js)
               bun --version
+              python3 utils/scripts/package-smoke.py
               /usr/bin/time -p bun build src/js/src/cli.ts --target=bun --outdir src/js/dist
               sh utils/scripts/smoke.sh "$(command -v bun)" "$PWD/src/js/dist/cli.js"
               python3 utils/scripts/index-smoke.py -- "$(command -v bun)" "$PWD/src/js/dist/cli.js"

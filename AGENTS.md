@@ -26,21 +26,40 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
 - Rust alone may use the explicitly approved `serde_json`; preserve its pinned
   Rust 1.69-compatible lockfile. No other direct dependencies without approval.
 - Compile first, then smoke-call the actual CLI. Unit tests are deferred until
-  the user explicitly requests them. Do not add test frameworks. Release tooling
-  stays preview-only unless the user explicitly approves the exact tag/commit.
+  the user explicitly requests them. Do not add test frameworks. The user authorized automatic alpha prereleases and prebuilt uploads on 2026-09-19;
+  publish only after verified same-repository alpha CI and complete native build smokes.
 - Keep development tasks in a small root `justfile` with `mod` files. Reuse Go's
   build cache, build once per smoke run, and record wall-clock iteration samples
   with the exact command/environment. Do not infer broad speedups from small samples.
 - Follow GitHub flow: issue first, small feature commits/pushes, PR into `alpha`,
   verify compile/smoke, merge, then checkout `alpha` and pull fast-forward-only.
-- Source only for now: no binary uploads, automatic tags, releases, or visibility
-  changes. Ask the user about `$calver` after shipping code. The installed skill
-  targets arra-oracle-skills-cli; our pinned pure-calculator adapter never runs
-  its mutating main entrypoint. Do not invent a Go CalVer engine or mutate arra.
-  `just go release` previews; `just release publish TAG SHA` requires user approval.
+- Automatic public prebuilt releases are now authorized: Linux/macOS x64+arm64,
+  all four ports, CalVer alpha tags, checksums and release metadata. GitHub Actions
+  handles build/upload/publish asynchronously; do not wait locally for the full
+  release matrix after queueing, and do not claim queued assets are published.
+- Keep write permission confined to the publish job. Validate exact source SHA,
+  upstream CI identity, archive contents and full asset set. Never overwrite a
+  published tag/asset. Skip superseded alpha heads rather than substituting code.
+- Upload only selected binaries/checksums/release manifests, never source indexes,
+  raw transcripts, private configuration, credentials or benchmark input artifacts.
+  The repository is already public; do not alter other repository visibility.
+- The installed `$calver` skill targets arra; reuse its pinned pure calculator,
+  never its mutating main entrypoint or a new Go version engine. `just go release`
+  stays read-only preview; trusted Actions publication is separately automated.
 - Use `relic` CLI incrementally to retain long-session context. Read only relevant
   history and keep raw transcripts/index databases local. Active sessions may
   remain changed immediately after indexing; do not loop trying to reach zero.
+
+## Naming and package entrypoints
+
+- The public umbrella repository is `Soul-Brews-Studio/maw-cli`; executables are
+  `maw-go`, `maw-rs`, `maw-js`, and `maw-zig`, with source under `src/{go,rs,js,zig}`.
+- Go installs from `src/go/cmd/maw-go`; root Git package metadata exposes `maw-js`
+  to bunx. No npm publication, build hook or extra runtime dependency is required.
+- Preserve the shared `maw` help/diagnostic and `maw-` plugin protocol. Exclude all
+  four host executable names from plugin discovery to avoid recursive hosts.
+- JavaScript named helpers use one function per `mod.<function>.ts`; keep `cli.ts`
+  as the small executable entrypoint and shared declarations in `types.ts`.
 
 ## Serena MCP: indexing and understanding
 

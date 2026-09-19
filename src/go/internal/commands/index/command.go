@@ -16,7 +16,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/Soul-Brews-Studio/maw-herdr/src/go/internal/command"
+	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/command"
 )
 
 const maxBytes = 64 * 1024 * 1024

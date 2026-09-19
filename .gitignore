@@ -22,3 +22,8 @@ __pycache__/
 /src/zig/zig-out/
 
 /docs/benchmarks/cli/results/
+
+# Release staging (only selected archives/manifests are uploaded by CI)
+/release-assets/
+/release-input/
+/release-plan.json

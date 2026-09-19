@@ -2,7 +2,7 @@
 
 ## Boundaries
 
-`src/go/cmd/maw` wires standard streams, interrupt cancellation, and version information
+`src/go/cmd/maw-go` wires standard streams, interrupt cancellation, and version information
 into `src/go/internal/cli.Run`. It returns the command's exit status to the shell.
 
 `src/go/internal/command.CommandPlugin` defines metadata, flag binding and contextual
@@ -20,23 +20,29 @@ selected plugins with `os/exec` and an argument slice, not a shell command strin
 Core dependencies are the standard library only. Existing Go code need not link
 against an SDK to provide a plugin; any language can implement the process contract.
 
-Version display uses Go's build info: a local checkout prints `dev`; a remote
-build prints its module version. The other prototypes print `dev`.
-No Go version-bump engine: the gated development release script reuses a pinned
+Local builds print `dev`; Go remote builds can report the module version.
+Release builds inject the same immutable CalVer tag into all four executables.
+No Go version-bump engine: the development release script reuses a pinned
 upstream CalVer calculator, separate from CLI runtime.
 
 ## Independent runtime implementations
 
 | Directory | Entry / router | Plugin process boundary |
 |---|---|---|
-| `src/go/` | `cmd/maw/main.go`, `internal/cli/cli.go` | `internal/cli/plugins.go` |
+| `src/go/` | `cmd/maw-go/main.go`, `internal/cli/cli.go` | `internal/cli/plugins.go` |
 | `src/rs/` | `src/main.rs`, `src/cli.rs` | `src/plugins.rs` |
-| `src/js/` | `src/cli.ts` via Bun | `src/plugins.ts` |
+| `src/js/` | `src/cli.ts` → `src/mod.run.ts` via Bun | `src/mod.discover.ts`, `src/mod.execute.ts` |
 | `src/zig/` | `src/main.zig` | `src/registry.zig` discovers; `Host.execute` spawns |
 
 These are fresh ports of this small contract, not copies of the external learned
 maw-rs/maw-js repositories. Each owns its manifest and generated cache/output.
 Root `go.work` assists local Go navigation; the standalone module is `src/go/go.mod`.
+The public executables are `maw-go`, `maw-rs`, `maw-js`, and `maw-zig`.
+The common help/diagnostic prefix stays `maw`, and plugins keep the `maw-` prefix;
+the four host names are reserved, not recursively discovered as plugins.
+JavaScript uses one named function per `mod.<function>.ts`; `mod.run` assembles
+the registry, `mod.indexTrace` calls `mod.validUnicode` and `mod.object`.
+Root `package.json` exposes the Bun entrypoint as `maw-js` for direct GitHub bunx.
 Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark
 methodology is [here](benchmarks/cli/README.md); comparisons cover the actual

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Soul-Brews-Studio/maw-herdr/src/go/internal/command"
+	"github.com/Soul-Brews-Studio/maw-cli/src/go/internal/command"
 )
 
 type plugin struct {

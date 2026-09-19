@@ -1,5 +1,8 @@
 # Master blueprint implementation audit
 
+Historical PR9 audit. Later changes: [automatic prebuilt releases](release.md)
+and [direct GitHub bunx](running.md) supersede the source-only publication limits below.
+
 The full user blueprint, plus later approval of Rust `serde_json`, public visibility
 and `src/` / `docs/` / `utils/` layout, is the scope—not only the initial help milestone.
 
