@@ -93,3 +93,6 @@ use Go flag parsing; external plugin argv is untouched. Flags precede positional
 reserved wherever built in; adding a command requires importing its package, not
 editing a switch ladder. This is static package registration, **not** Go shared-library
 plugins or runtime-loaded code. No dependency framework.
+
+The host names `maw-go`, `maw-rs`, `maw-js`, and `maw-zig` are reserved and
+excluded from discovery. Install them side by side without recursive host plugins.

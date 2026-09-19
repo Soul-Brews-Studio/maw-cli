@@ -19,6 +19,8 @@ Without `just`, check Go with `sh utils/scripts/check.sh`.
 No unit tests yet. Smoke fixtures use harmless isolated executable plugins and
 verify help/list side effects, argv, streams and normal exit status. See the
 [plugin contract](plugins.md) for trust and signal-forwarding limits.
+JavaScript named helpers use `src/js/src/mod.<function>.ts`, one function per file;
+`cli.ts` is the executable entrypoint. Root `package.json` exposes it to GitHub bunx.
 Rust alone uses the approved `serde_json`; the other ports use built-in JSON parsers.
 
 ## Measure
@@ -47,7 +49,8 @@ maw-js and maw-rs. Serena keeps `learning/index`; CodeGraph cross-checks symbols
 just memory index    # incremental Relic history checkpoint, kept local
 ```
 
-Raw transcripts, indexes, build outputs and benchmark JSON are not uploaded.
+Raw transcripts, indexes and benchmark JSON are not uploaded.
+Only selected prebuilt binaries and release metadata are uploaded by release CI.
 Active sessions can remain changed immediately after indexing.
 
 ## Ship source
@@ -56,9 +59,10 @@ Issue → focused feature commits → PR into `alpha` → compile/smoke → merg
 sync `alpha`. `CLAUDE.md` remains a relative symlink to [AGENTS.md](../AGENTS.md).
 
 ```sh
-just go release      # read-only CalVer and release-notes preview
+just go release      # read-only CalVer preview
 ```
 
 [Release tasks](release.md) reuse the pinned upstream CalVer calculator without
-mutating arra. Publication requires explicit approval of the exact tag and commit;
-preview creates no tag, release or binary upload.
+mutating arra. Successful canonical alpha push CI automatically starts the native
+prebuilt matrix and publishes a CalVer prerelease after all builds pass. It runs
+in the background; preview itself creates no tag, release or binary upload.

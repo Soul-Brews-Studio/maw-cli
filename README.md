@@ -1,31 +1,39 @@
-# maw-herdr
+# maw-cli
 
-A help-first CLI with independent Go, Rust, Bun and Zig implementations.
+A help-first CLI: `maw-go`, `maw-rs`, `maw-js` and `maw-zig`.
 Modular built-ins and external executable plugins; no tmux service or agent engine.
 
 ## Run from GitHub
 
+With **Bun**, no clone required:
+
+```sh
+bunx --bun --package 'https://github.com/Soul-Brews-Studio/maw-cli#alpha' maw-js --help
+```
+
 With **Go 1.22+**, no clone required:
 
 ```sh
-go run github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw@alpha --help
+go run github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha --help
 ```
 
 `@alpha` follows development. Use an exact commit to pin a revision;
-CalVer alpha releases are planned, not published yet.
+CI automatically publishes immutable CalVer alpha prereleases.
 
 ## Choose a runtime
 
 | Runtime | How to run |
 | --- | --- |
-| Go | Run directly from GitHub above, or install `maw` |
-| Bun | Clone, then `bun src/js/src/cli.ts --help` |
-| npx | Clone, then use npx to run Bun; not a native Node port |
-| bunx | Clone, then use bunx to select Bun; no published maw package |
+| None | [Prebuilt downloads](https://github.com/Soul-Brews-Studio/maw-cli/releases): Linux/macOS, x64/ARM64 |
+| Go | Run directly from GitHub above, or install `maw-go` |
+| Bun / bunx | Run directly from GitHub above |
+| npx | Use npx to run Bun + the GitHub package; see guide |
 | Rust / Zig | Clone and compile their independent ports |
 
 **[Run and install guide →](docs/running.md)** — exact commands and version pinning.
-No `maw-herdr` package is published for npx/bunx.
+No npm publication is needed: bunx downloads the GitHub source.
+[Prebuilt builds](https://github.com/Soul-Brews-Studio/maw-cli/actions/workflows/release.yml)
+run in the background after successful alpha CI.
 
 ## Commands
 

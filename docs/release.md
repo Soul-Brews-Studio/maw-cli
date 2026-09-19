@@ -1,57 +1,82 @@
-# Source-only release, explicit approval gate — issue #7
+# Automatic alpha prebuilt releases
 
-`go release` is **not a Go builtin**. Use `just go release` (an alias for
-`just release preview`). It does not bump a package, commit, tag, push, or publish.
-Bun, Python 3, Git and authenticated `gh` are development prerequisites.
+A successful **push CI run on the canonical `alpha` branch** starts
+[Alpha prebuilt release](https://github.com/Soul-Brews-Studio/maw-cli/actions/workflows/release.yml).
+GitHub builds and publishes in the background; no local waiting or per-tag approval
+is required. This implements the user's September 19 authorization for public
+prebuilt uploads. PR/fork CI never grants publication authority.
 
-The installed `$calver` skill targets arra-oracle-skills-cli. We reuse its
-[upstream pure `computeVersion` export](https://github.com/Soul-Brews-Studio/arra-oracle-skills-cli/blob/68110ad0641f5b7bc8a14a988971ff4ead9ad77a/scripts/calver.ts)
-from a commit- and SHA256-pinned temporary download, rather than creating a Go
-version calculator or modifying that external repository. No new runtime CLI
-dependency is introduced. The upstream CLI `--check` can repair invalid dates in
-package.json before its check guard; **do not execute its main entrypoint here**.
+## What ships
 
-Scheme: `vYY.M.D-alpha.HMM`, Asia/Bangkok, integer hour*100+minute with no leading
-zeros (the skill's actual format, not zero-padded SemVer components). Same-minute
-collisions fail instead of overwriting tags. Preview also generates notes using
-GitHub's releases/generate-notes endpoint, following merged PRs and their linked
-issues. It prints the exact commit and proposed tag for review. No release asset
-or raw transcript is uploaded.
+Native builds smoke all four ports on these [hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners):
 
-After the user explicitly approves a particular previewed tag and alpha commit:
+| Platform | x64 (`amd64`) | ARM64 (`arm64`) |
+| --- | --- | --- |
+| Linux | `ubuntu-24.04` | `ubuntu-24.04-arm` |
+| macOS (`darwin`) | `macos-15-intel` | `macos-15` |
+
+The public prerelease contains **16 archives**, `SHA256SUMS`, and `release.json`.
+Each `maw-{go,rs,js,zig}-{linux,darwin}-{amd64,arm64}.tar.gz` contains only:
+
+- `maw-go`, `maw-rs`, `maw-js` or `maw-zig`: the selected native executable;
+- `RELEASE.json`: source commit, tag, language, platform and binary SHA256.
+
+Go adds `context`; the other shared commands are available in all ports. Bun's
+[standalone executable](https://bun.com/docs/bundler/executables) embeds Bun.
+Linux compatibility is measured on Ubuntu 24.04, not every libc/distribution;
+macOS downloads are not developer-signed or notarized. No Windows build is provided.
+
+Only selected release outputs are uploaded. Transcripts, local indexes,
+configuration and raw benchmark inputs remain private. Temporary Actions artifacts
+expire after seven days; public downloads belong on [Releases](https://github.com/Soul-Brews-Studio/maw-cli/releases).
+Alpha prereleases are not GitHub's `latest` release.
+
+## Immutable CalVer selectors
+
+The pinned upstream [pure `computeVersion` export](https://github.com/Soul-Brews-Studio/arra-oracle-skills-cli/blob/68110ad0641f5b7bc8a14a988971ff4ead9ad77a/scripts/calver.ts)
+provides the Bangkok calendar date and integer hour*100+minute. The source is
+SHA256-verified before import; its mutating main entrypoint is never executed.
+No Go version calculator or runtime dependency is added.
+
+The successful source CI run's creation time and ID give deterministic selectors:
+
+- Root release tag: `vYY.M.D-alpha.HMM.CI_RUN_ID`.
+- Nested Go tag: `src/go/v0.YYYYMMDD.HMM-alpha.CI_RUN_ID`.
+- Both point to the same full source SHA. The run suffix avoids minute collisions.
+
+Use a published root tag after `#` in bunx. Use `go_version` from `release.json`
+after `@` in `go run/install .../src/go/cmd/maw-go`. The `v0` companion respects
+[Go nested-module rules](https://go.dev/ref/mod#vcs-version) without changing the
+module path. `alpha` remains the moving development branch.
+
+## Trust, retries and failure
+
+`prepare` validates the upstream workflow path, repository, event, branch,
+conclusion and exact SHA. Every job checks out that SHA, not workflow_run's
+default-branch SHA. Build jobs are read-only; only `publish` gets `contents: write`.
+Publication revalidates CI evidence and the complete archive set, binary format,
+architecture, metadata and checksums before creating immutable tags.
+
+Assets upload to a draft, then publish only after all 18 match. A matching draft
+can resume; a matching complete release is a no-op. Existing tags and assets are
+never moved or clobbered. A rebuilt binary with different bytes is rejected,
+not silently substituted; retry the failed publish job with its original artifacts.
+If artifacts expired, rerun source CI to obtain a new run-qualified release.
+
+If alpha advances, stale work skips instead of relabeling old binaries. A race may
+leave an unpublished draft or tags; inspect the run before recovery. Never force
+move tags or use `--clobber`. Keep tag creation and publication in this workflow:
+[GITHUB_TOKEN events do not start ordinary downstream workflows](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+
+## Local tools
 
 ```sh
-just release publish <approved-tag> <approved-full-alpha-SHA>
+just go release      # read-only CalVer preview; not a Go builtin
+just release prepare CI_RUN_ID /tmp/release-plan.json
+# Mutating recovery: only with the exact verified plan and original CI archives
+just release publish /tmp/release-plan.json /path/to/release-assets
 ```
 
-Publication requires tracked-clean `alpha`, the exact matching remote SHA, all
-eight successful Linux/macOS language checks, and an absent remote tag. It creates
-an annotated source tag and prerelease with generated notes, **no binaries**.
-An interrupted publish can leave a pushed tag without a release; inspect the exact
-tag and use `gh release create --verify-tag` to recover after renewed approval.
-Never force-delete or move published tags. No automatic push-triggered release.
-The mutating publication branch remains deliberately unexecuted until approval.
-
-## Go install selectors
-
-Yes: `@alpha` can coexist with immutable alpha CalVer releases. It names the
-moving **branch**, not a release. Today there are no published release tags;
-use `@alpha` for current code or `@<commit>` for a fixed snapshot.
-
-For the nested `src/go` module, a Go-compatible CalVer release could use:
-
-- Git tag: `src/go/v0.20260919.1020-alpha`
-- Install selector: `@v0.20260919.1020-alpha`
-- Command path: `github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw`
-
-This is a **proposed, unpublished companion tag**, not something the current
-release script creates. It keeps the import path stable: a `v26.9.19-alpha.1020`
-Go semantic version would require a `/v26` module suffix. The existing script's
-repository-wide CalVer tag can remain the human release name, with a future
-Go-module companion tag pointing to the same commit. Alternatively, a non-semantic
-repository tag such as `alpha-26.9.19.1020` can be queried as a revision; Go normally
-records that as a pseudo-version. None of these example tags has been published.
-
-Go's `@latest` prefers stable releases over prereleases; it is not an alias for
-our alpha branch. See [Go version/tag mapping](https://go.dev/ref/mod#vcs-version)
-and [version queries](https://go.dev/ref/mod#version-queries).
+These development helpers need Python 3, Bun, Git and authenticated `gh`.
+Preview never commits, tags, pushes or publishes. See the [run guide](running.md)
+for download and source commands.
