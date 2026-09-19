@@ -32,7 +32,26 @@ tag and use `gh release create --verify-tag` to recover after renewed approval.
 Never force-delete or move published tags. No automatic push-triggered release.
 The mutating publication branch remains deliberately unexecuted until approval.
 
-Repository CalVer tags are not Go module semantic-version tags: the nested module
-has no `/v26` suffix. Continue using `go run/install .../go/cmd/maw@alpha` or an
-exact commit (shown in preview), rather than promising `@latest` resolves CalVer.
-This preserves the lean module path while retaining calendar-tagged source.
+## Go install selectors
+
+Yes: `@alpha` can coexist with immutable alpha CalVer releases. It names the
+moving **branch**, not a release. Today there are no published release tags;
+use `@alpha` for current code or `@<commit>` for a fixed snapshot.
+
+For the nested `src/go` module, a Go-compatible CalVer release could use:
+
+- Git tag: `src/go/v0.20260919.1020-alpha`
+- Install selector: `@v0.20260919.1020-alpha`
+- Command path: `github.com/Soul-Brews-Studio/maw-herdr/src/go/cmd/maw`
+
+This is a **proposed, unpublished companion tag**, not something the current
+release script creates. It keeps the import path stable: a `v26.9.19-alpha.1020`
+Go semantic version would require a `/v26` module suffix. The existing script's
+repository-wide CalVer tag can remain the human release name, with a future
+Go-module companion tag pointing to the same commit. Alternatively, a non-semantic
+repository tag such as `alpha-26.9.19.1020` can be queried as a revision; Go normally
+records that as a pseudo-version. None of these example tags has been published.
+
+Go's `@latest` prefers stable releases over prereleases; it is not an alias for
+our alpha branch. See [Go version/tag mapping](https://go.dev/ref/mod#vcs-version)
+and [version queries](https://go.dev/ref/mod#version-queries).
