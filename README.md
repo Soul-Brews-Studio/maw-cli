@@ -9,6 +9,18 @@ Choose one implementation. Go adds `context`, verified self-`update`, detailed
 marketplace rows and plugin `@`/`#` selectors. All ports share the basic
 help/version/plugin contract.
 
+**Install, then update? Choose Go: only `maw-go` supports self-update.**
+The pinned install examples below use the published
+[v26.9.19-alpha.2047](https://github.com/Soul-Brews-Studio/maw-cli/releases/tag/v26.9.19-alpha.2047)
+release, not a promise of the latest version. These install language-specific
+names, not `maw`. Check for existing same-named executables before replacing them;
+keep the relevant PATH export in your shell profile for future terminals.
+
+- Install: [Go](#go-run-or-install-directly) · [Bun](#bun-install-globally) ·
+  [Rust](#rust-install-from-github) · [Zig](#zig-build-and-install)
+- No compiler: [prebuilts](#prebuilt-no-compiler-or-runtime)
+- No persistent install: [bunx / npx](#bun--bunx-run-directly-from-github)
+
 ### Prebuilt: no compiler or runtime
 
 Open [Releases](https://github.com/Soul-Brews-Studio/maw-cli/releases), choose a
@@ -71,6 +83,19 @@ npx fetches Bun, then Bun runs the GitHub package; this is **not a native Node
 port**. `--yes` accepts npm's install prompt. No registry package named maw-cli
 is published. Both runners execute code with your user privileges.
 
+### Bun: install globally
+
+Requires Bun **1.3.11+**. This installs the Git package's `maw-js` executable;
+Bun must remain on PATH to run it. See [global Git installs](https://bun.com/docs/pm/cli/add).
+
+```sh
+bun add --global 'git+https://github.com/Soul-Brews-Studio/maw-cli.git#v26.9.19-alpha.2047'
+export PATH="$(bun pm bin -g):$PATH"
+
+maw-js --help
+maw-js plugin ls
+```
+
 ### Go: run or install directly
 
 Requires Go **1.22+**. No clone or GitHub authentication is needed:
@@ -79,32 +104,80 @@ Requires Go **1.22+**. No clone or GitHub authentication is needed:
 go run github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha --help
 ```
 
-To install an executable named `maw-go`:
+Install the pinned release into a user-writable directory:
 
 ```sh
-go install github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@alpha
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
+GOBIN="$HOME/.local/bin" go install github.com/Soul-Brews-Studio/maw-cli/src/go/cmd/maw-go@v0.20260919.2047-alpha
+
+maw-go version
+maw-go --help
 ```
 
-**Check for an existing `maw-go` before installing.** Set `GOBIN` to a separate
-absolute directory to avoid replacing it. Otherwise Go installs into its default
-binary directory, normally `$(go env GOPATH)/bin`; add that directory to PATH.
+For the moving branch, replace `@v0.20260919.2047-alpha` with `@alpha`.
+Choose a different absolute `GOBIN` to avoid replacing an existing `maw-go` in
+`~/.local/bin`. Without `GOBIN`, Go normally uses `$(go env GOPATH)/bin`.
 
 ### Update the Go host
 
 ```sh
-maw-go update --check                     # current version, release tag and commit
-maw-go update                             # latest published alpha, not the alpha branch
-maw-go update --version v26.9.19-alpha.1547 # explicit published tag; can downgrade
+maw-go update --check # current version, release tag, commit and status
+maw-go update        # latest published alpha, not the alpha branch
 ```
 
-An older installation without `update` needs one more `go install ...@alpha`
-using the full path above. Self-update supports native Go-installed/prebuilt
+To explicitly reinstall or downgrade to a published tag:
+
+```sh
+maw-go update --version v26.9.19-alpha.2047
+```
+
+An older installation without `update` needs the full Go install command above
+once more. Self-update supports native Go-installed/prebuilt
 executables on Linux/macOS, amd64/arm64. It downloads the matching prebuilt,
 verifies checksums, metadata and its exact version, then replaces only the
 current executable. No Go compiler, curl, tar or Git is needed for self-update.
 Plugins/configuration stay untouched; other ports do not have this command yet.
 Local `dev`/`go run` builds can only `--check`. A newer source install waits for
 a published release instead of silently downgrading. [Update contract](docs/self-update.md).
+
+### Rust: install from GitHub
+
+Requires Rust **1.69+**. [Cargo](https://doc.rust-lang.org/cargo/commands/cargo-install.html)
+finds the `maw-rs` package inside this repository:
+
+```sh
+cargo install --git https://github.com/Soul-Brews-Studio/maw-cli \
+  --tag v26.9.19-alpha.2047 --locked --bin maw-rs maw-rs
+
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+maw-rs --help
+```
+
+### Zig: build and install
+
+Requires Zig **0.16.0** and Git. Run from a directory without an existing
+`maw-cli` folder:
+
+```sh
+git clone --depth 1 --branch v26.9.19-alpha.2047 \
+  https://github.com/Soul-Brews-Studio/maw-cli.git
+
+(
+  cd maw-cli/src/zig &&
+  zig build -Doptimize=ReleaseFast \
+    -Dversion=v26.9.19-alpha.2047 --prefix "$HOME/.local"
+)
+
+export PATH="$HOME/.local/bin:$PATH"
+maw-zig --help
+```
+
+Bun, Rust and Zig do **not** support self-`update` yet. Install a newer published
+tag using the corresponding command instead. `plugin update` updates a plugin,
+not the host CLI. Bun/Rust source installs may report `dev`; a source tag pin is
+not necessarily an embedded release version. Prebuilt executables embed CalVer.
 
 ### Local source: Bun, Rust and Zig
 
