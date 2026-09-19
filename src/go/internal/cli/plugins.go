@@ -46,7 +46,7 @@ func discover() map[string]string {
 				continue
 			}
 			name = strings.TrimPrefix(name, "maw-")
-			if !validName(name) {
+			if !validName(name) || name == "go" || name == "rs" || name == "js" || name == "zig" {
 				continue
 			}
 			if _, exists := plugins[name]; exists {

@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 const registry = @import("registry.zig");
 const trace_index = @import("index.zig");
 
@@ -79,7 +80,7 @@ const Host = struct {
             },
             .version => {
                 if (args.len != 1) return self.fail("usage: maw version");
-                try self.output(.stdout(), "maw dev\n", .{});
+                try self.output(.stdout(), "maw {s}\n", .{build_options.version});
             },
             .plugins => {
                 if (args.len != 1) return self.fail("usage: maw plugins");

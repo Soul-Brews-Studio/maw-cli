@@ -24,6 +24,15 @@ printf 'probe stderr\n' >&2
 exit 7
 PLUGIN
 chmod +x "$tmp/plugins/maw-probe"
+# Host binaries share the maw-* prefix but must never become plugins.
+for host in go rs js zig; do
+    cat > "$tmp/plugins/maw-$host" <<'HOST'
+#!/bin/sh
+printf 'host ran\n' >> "$MAW_SMOKE_MARKER"
+exit 91
+HOST
+    chmod +x "$tmp/plugins/maw-$host"
+done
 MAW_SMOKE_MARKER="$tmp/marker"
 export MAW_SMOKE_MARKER
 
@@ -44,6 +53,22 @@ run version > "$tmp/version"
 grep -q '^maw .' "$tmp/version"
 run plugins > "$tmp/plugins-list"
 grep -q 'probe.*external' "$tmp/plugins-list"
+for host in go rs js zig; do
+    if grep -q "^$host[[:space:]]" "$tmp/plugins-list"; then
+        fail "host binary discovered as plugin: $host"
+    fi
+    if grep -q "^  $host[[:space:]]" "$tmp/help"; then
+        fail "host binary listed in help: $host"
+    fi
+    status=0
+    run "$host" > "$tmp/out" 2> "$tmp/err" || status=$?
+    [ "$status" -eq 2 ] || fail "host command exit: $host: $status"
+    grep -q 'unknown command' "$tmp/err"
+    status=0
+    run help "$host" > "$tmp/out" 2> "$tmp/err" || status=$?
+    [ "$status" -eq 2 ] || fail "host help exit: $host: $status"
+    grep -q 'unknown command' "$tmp/err"
+done
 [ ! -e "$tmp/marker" ] || fail 'help/list executed a plugin'
 
 status=0

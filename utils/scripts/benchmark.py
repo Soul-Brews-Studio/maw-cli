@@ -51,7 +51,7 @@ def commands(language, scratch=None):
     cwd = ROOT
     if language == "go":
         output = (scratch / "maw-go") if scratch else ROOT / "bin/maw-go"
-        build = [tool("go"), "-C", str(ROOT / "src/go"), "build", "-o", str(output), "./cmd/maw"]
+        build = [tool("go"), "-C", str(ROOT / "src/go"), "build", "-o", str(output), "./cmd/maw-go"]
         run = [str(output)]
         if scratch:
             env["GOCACHE"] = str(scratch / "cache")

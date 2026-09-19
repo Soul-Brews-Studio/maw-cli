@@ -111,7 +111,7 @@ pub fn run(args: Vec<OsString>) -> i32 {
         return fail(&format!("usage: {}", command.usage));
     }
     if name == "version" {
-        println!("maw dev");
+        println!("maw {}", option_env!("MAW_VERSION").unwrap_or("dev"));
     } else {
         println!("NAME\tTYPE\tPATH");
         for (name, command) in &registry {

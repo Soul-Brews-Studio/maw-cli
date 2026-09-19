@@ -51,7 +51,8 @@ pub fn discover(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]C
             }
             if (!std.mem.startsWith(u8, name, "maw-")) continue;
             name = name[4..];
-            if (!validName(name) or find(commands.items, name) != null) continue;
+            if (!validName(name) or std.mem.eql(u8, name, "go") or std.mem.eql(u8, name, "rs") or
+                std.mem.eql(u8, name, "js") or std.mem.eql(u8, name, "zig") or find(commands.items, name) != null) continue;
             const candidate = try std.fs.path.join(allocator, &.{ directory, entry.name });
             defer allocator.free(candidate);
             const resolved = std.Io.Dir.cwd().realPathFileAlloc(io, candidate, allocator) catch continue;

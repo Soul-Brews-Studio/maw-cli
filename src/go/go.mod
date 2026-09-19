@@ -1,3 +1,3 @@
-module github.com/Soul-Brews-Studio/maw-herdr/src/go
+module github.com/Soul-Brews-Studio/maw-cli/src/go
 
 go 1.22

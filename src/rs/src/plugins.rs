@@ -26,7 +26,10 @@ pub fn discover() -> BTreeMap<String, PathBuf> {
                 Some(name) => name,
                 None => continue,
             };
-            if !valid_name(name) || plugins.contains_key(name) {
+            if !valid_name(name)
+                || matches!(name, "go" | "rs" | "js" | "zig")
+                || plugins.contains_key(name)
+            {
                 continue;
             }
             let path = match std::fs::canonicalize(entry.path()) {
