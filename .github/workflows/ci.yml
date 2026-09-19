@@ -44,6 +44,7 @@ jobs:
               sh utils/scripts/smoke.sh "$PWD/bin/maw-go"
               python3 utils/scripts/marketplace-smoke.py "$PWD/bin/maw-go"
               python3 utils/scripts/selector-smoke.py "$PWD/bin/maw-go"
+              python3 utils/scripts/archive-smoke.py "$PWD/bin/maw-go"
               python3 utils/scripts/update-smoke.py
               go -C src/go vet ./...
               python3 utils/scripts/mcp-smoke.py "$PWD/bin/maw-go"

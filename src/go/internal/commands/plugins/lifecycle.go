@@ -16,6 +16,9 @@ var safeRef = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 func lifecycle(ctx context.Context, i *command.Invocation) int {
 	args := i.Args
+	if len(args) >= 2 && args[0] == "install" && archiveSource(args[1]) {
+		return archiveInstall(ctx, i)
+	}
 	usage := "usage: maw plugin install SOURCE[@REF|#REF] [--ref REF] | update NAME[@REF|#REF] [--ref REF] | info|check NAME"
 	if len(args) != 2 && len(args) != 4 {
 		return i.Fail(usage)
@@ -44,6 +47,16 @@ func lifecycle(ctx context.Context, i *command.Invocation) int {
 		}
 	}
 	root, _, err := paths()
+	if err == nil && args[0] == "update" {
+		if !lifecycleName(args[1]) {
+			return i.Fail("invalid plugin name")
+		}
+		var unlock func()
+		unlock, err = lockPluginInstall(root, args[1])
+		if err == nil {
+			defer unlock()
+		}
+	}
 	if err == nil {
 		if args[0] == "install" {
 			err = installGitPlugin(ctx, root, args[1], ref, i)
@@ -120,6 +133,11 @@ func installGitPlugin(ctx context.Context, root, source, ref string, i *command.
 		return err
 	}
 	target := filepath.Join(root, name)
+	unlock, err := lockPluginInstall(root, name)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if _, err = os.Lstat(target); !os.IsNotExist(err) {
 		return fmt.Errorf("plugin destination already exists: %s", name)
 	}
@@ -138,7 +156,7 @@ func managedPlugin(ctx context.Context, root, name string) (string, error) {
 	for _, path := range []string{dir, filepath.Join(dir, ".git")} {
 		info, err := os.Lstat(path)
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return "", fmt.Errorf("plugin must be its own real Git checkout")
+			return "", fmt.Errorf("plugin must be its own real Git checkout; for an archive install, reinstall its .tar.gz with plugin install (use --backup to keep the old copy)")
 		}
 	}
 	real, err := filepath.EvalSymlinks(dir)

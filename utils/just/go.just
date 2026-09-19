@@ -8,6 +8,7 @@ smoke:
     /usr/bin/time -p sh utils/scripts/smoke.sh "$(pwd)/bin/maw-go"
     /usr/bin/time -p python3 utils/scripts/marketplace-smoke.py "$(pwd)/bin/maw-go"
     /usr/bin/time -p python3 utils/scripts/selector-smoke.py "$(pwd)/bin/maw-go"
+    /usr/bin/time -p python3 utils/scripts/archive-smoke.py "$(pwd)/bin/maw-go"
     /usr/bin/time -p python3 utils/scripts/update-smoke.py
 
 check: build smoke

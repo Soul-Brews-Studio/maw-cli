@@ -18,6 +18,56 @@ maw-go plugin update herdr --ref FULL_COMMIT_SHA
 Replace `maw-go` with `maw-rs`, `maw-js`, or `maw-zig`. This is the new polyglot
 maw-cli; it does not change an unrelated older `maw` executable on PATH.
 
+## Go archive installations
+
+```sh
+maw-go plugin install ./package.tar.gz
+maw-go plugin install ./package.tgz --backup
+maw-go plugin install https://github.com/OWNER/REPO/archive/COMMIT.tar.gz --replace
+```
+
+This explicit tarball route needs no Git, tar command, compiler or added library.
+It accepts local regular `.tar.gz`/`.tgz` files and HTTPS URLs with those path
+suffixes (query strings allowed, URL credentials/fragments forbidden). Existing
+Git directories/URLs and marketplace shorthand retain the Git behavior below.
+`--ref` is for Git sources, not archives: encode the source ref in the archive URL.
+Only Go supports this route; the other ports remain Git-only installers.
+
+- Extract into private staging under the configured plugin root. Accept a root
+  `plugin.json` or exactly one enclosing directory (GitHub archive layout).
+  Global PAX metadata is ignored; resolved member paths are still validated.
+- Reject traversal/absolute/backslash/control paths, `.git` contents, duplicate
+  members, symlinks, hard links and special files. Only directories and regular
+  files are materialized. Preserve executable bits, discard special permission
+  bits. Compressed input is limited to 128 MiB, the uncompressed stream to
+  512 MiB, returned tar headers to 4096, manifests to 1 MiB. Verify gzip CRC.
+- Require valid name/version/entry and an in-tree regular entry file. If declared,
+  validate `artifact`/`bundledArtifacts` paths and SHA-256 digests; these are
+  package self-consistency checks, not independently trusted signatures. The
+  archive must come from a trusted source. Never execute package code on install.
+- Download only over HTTPS with a two-minute timeout and bounded HTTPS redirects.
+  No authentication token is loaded or forwarded. Private Actions downloads are
+  not automatic; download/unzip the CI artifact separately and install its tarball.
+- For an existing real directory, prompt for `[B]` backup-and-replace (Enter is
+  the default), `[r]` replace without a lasting backup, or `[c]` cancel. EOF also
+  cancels. Piped input cannot authorize replacement; scripts supply exactly one
+  of `--backup`/`--replace`. Existing symlinks and non-directories are refused.
+- Use a per-plugin install/update lock and recheck destination identity after the
+  prompt. Keep backups at `<resolved-plugin-root>-backups/<unique>/<name>`, outside
+  inventory discovery. Local edits and all old files are preserved with `--backup`.
+  Replacement moves the old directory aside, promotes the staged candidate, and
+  restores the old directory on ordinary promotion failure. If restoration fails,
+  preserve its recovery path. This two-rename operation is not a crash-atomic swap;
+  interruption can leave a lock and an old copy requiring manual recovery.
+- No archive auto-update/provenance registry is added. `info`, `check` and `update`
+  retain their real-Git-checkout requirement and direct archive users to reinstall.
+  `plugin ls -v`/marketplace still show ordinary non-Git installed metadata.
+
+For Herdr serving, choose a native **package**, not GitHub's source tarball.
+The ready-to-run package contains `index.js`, `plugin.json`, and
+`bin/maw-herdr-serve`; Bun and Herdr remain runtime requirements. Source archives
+do not become native packages merely by extracting them.
+
 ## Small contract
 
 - `marketplace [ls|list]` prints a header and the known `herdr` repository. It is
