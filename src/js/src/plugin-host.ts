@@ -24,11 +24,16 @@ if (!handler) {
 
 // source "cli" means the plugin streams straight to the terminal, which keeps
 // interactive and long-running verbs live instead of buffering to the end.
+//
+// The writer must reach stdout directly. Plugins funnel their console.log into
+// ctx.writer, so a writer that calls console.log recurses until the stack dies.
 const result = await handler({
   source: "cli",
   args,
   matchedName: process.env.MAW_MATCHED_NAME || undefined,
-  writer: (...parts: unknown[]) => console.log(...parts),
+  writer: (...parts: unknown[]) => {
+    process.stdout.write(`${parts.map(part => typeof part === "string" ? part : Bun.inspect(part)).join(" ")}\n`);
+  },
 });
 
 if (result && typeof result === "object") {
