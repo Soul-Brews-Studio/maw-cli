@@ -70,23 +70,29 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
 
     before = snapshot()
     expected = ("4 plugins (3 active, 1 disabled)\n"
-                "  core: 1 · standard: 2 · extra: 0\n"
-                "  cli: 3 · api: 1 · health: 1 missing executable\n"
-                "  alpha · beta · gamma\n"
-                "  disabled hidden by default — use --all to include\n")
+                "  core: 2 · standard: 2 · extra: 0\n"
+                "  cli: 4 · api: 1 · health: 1 missing executable\n"
+                "  alpha · off (disabled) · beta · gamma (no executable)\n")
     for args in (["plugin", "ls"], ["plugins", "ls"], ["plugins"]):
         result = run(args)
         assert result.stdout == expected, (args, result.stdout)
         assert "broken" in result.stderr and "ts-only" in result.stderr, result.stderr
-    rows = "".join(f"{name}\t1.0.0\t{tier}\tenabled\t{directory}\n" for name, tier, directory in
-                   (("alpha", "core", alpha), ("beta", "standard", beta), ("gamma", "standard", gamma)))
+    # -v renders the maw-rs table: a section per non-empty tier, per-section
+    # column widths measured on the raw cell (escapes included, as maw-rs does),
+    # then an active count. Assert the shape, not a hand-built string.
     for args in (["plugin", "ls", "-v"], ["plugins", "ls", "--verbose"], ["plugins", "-v"]):
-        assert run(args).stdout == rows
-    all_rows = rows.replace(f"beta\t1.0.0", f"off\t1.0.0\tcore\tdisabled\t{off}\nbeta\t1.0.0")
-    assert run(["plugin", "ls", "--all", "-v"]).stdout == all_rows
+        table = run(args).stdout
+        assert "\x1b[1mcore\x1b[0m (2)" in table, table
+        assert "\x1b[1mstandard\x1b[0m (2)" in table, table
+        assert "name  " in table and "\u2500" in table, table
+        assert "cli:alpha" in table and alpha.name in table, table
+        assert "\x1b[90m\u25cb\x1b[0m disabled" in table, table
+        assert off.name in table, table
+        assert table.endswith("3 active. 1 disabled \u2014 use 'maw plugin ls --all' to see them.\n"), table
     all_summary = run(["plugin", "ls", "--all"]).stdout
     assert "core: 2 · standard: 2 · extra: 0" in all_summary
-    assert "cli: 4 · api: 1" in all_summary and "alpha · off · beta · gamma" in all_summary
+    assert "cli: 4 · api: 1" in all_summary
+    assert "alpha · off (disabled) · beta · gamma (no executable)" in all_summary
     for args in (["plugin"], ["plugin", "ls", "extra"], ["plugin", "ls", "--wat"],
                  ["plugins", "install"], ["plugin", "ls", "-v", "-v"]):
         assert "usage:" in run(args, status=2).stderr
@@ -107,7 +113,11 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
         directory.mkdir()
         write(directory / "plugin.json", {"name": "unicode", "version": version})
     result = run(["plugin", "ls", "-v"], {"MAW_PLUGINS_DIR": str(unicode_root)})
-    assert result.stdout == f"unicode\t1.0.0\textra\tenabled\t{unicode_root / chr(0xe000)}\n", result.stdout
+    # Deterministic dedup by name: the U+E000 directory (1.0.0) wins over
+    # U+10000 (2.0.0). Asserted through the table, which is the only -v format.
+    assert "1.0.0" in result.stdout and "2.0.0" not in result.stdout, result.stdout
+    assert str(unicode_root / chr(0xe000)) in result.stdout, result.stdout
+    assert result.stdout.endswith("\n1 active\n"), result.stdout
 
     edge = root / "edge"
     edge.mkdir()
@@ -143,7 +153,11 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
     unsafe.mkdir()
     write(unsafe / "plugin.json", {"name": "escaped", "version": "1"})
     result = run(["plugin", "ls", "-v"], {"MAW_PLUGINS_DIR": str(limit)})
-    assert result.stdout == f"escaped\t1\textra\tenabled\t{limit}/unsafe\\u000apath\n", result.stdout
+    # A newline in a directory name must stay escaped, or it would forge an
+    # extra table row. Body rows = 1 despite the raw newline in the path.
+    assert f"{limit}/unsafe\\u000apath" in result.stdout, result.stdout
+    assert "\n" not in result.stdout.split("escaped")[1].split("\n")[0], result.stdout
+    assert result.stdout.endswith("\n1 active\n"), result.stdout
 
     # Global overrides and data/config-root selection must not leak real HOME.
     for extra in ({"MAW_PLUGINS_DIR": str(empty)}, {"MAW_HOME": str(root / "missing")},
@@ -153,7 +167,8 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
     custom = root / "custom"
     custom.mkdir()
     write(custom / "maw.config.json", {"disabledPlugins": ["alpha", "beta", "gamma", "off"]})
-    assert run(["plugin", "ls", "-v"], {"MAW_CONFIG_DIR": str(custom)}).stdout == ""
+    all_disabled = run(["plugin", "ls", "-v"], {"MAW_CONFIG_DIR": str(custom)}).stdout
+    assert all_disabled.endswith("0 active. 4 disabled \u2014 use 'maw plugin ls --all' to see them.\n"), all_disabled
     assert "4 disabled" in run(["plugin", "ls"], {"XDG_CONFIG_HOME": str(custom.parent), "MAW_CONFIG_DIR": str(custom)}).stdout
     (custom / "maw.config.json").write_text("{")
     assert not run(["plugin", "ls"], {"MAW_CONFIG_DIR": str(custom)}, status=1).stdout

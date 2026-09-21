@@ -37,15 +37,18 @@ export function scanInstalledPlugins(root: string, disabled: Set<string>): Insta
       const bundle = m.target !== "wasm" && typeof artifact.path === "string" ? artifact.path : "";
       const path = entry || bundle || wasm;
       const cli = (!!m.cli && typeof m.cli === "object" && !Array.isArray(m.cli)) || !!path;
-      const api = !!m.api && typeof m.api === "object" && !Array.isArray(m.api);
+      const apiConfig = m.api && typeof m.api === "object" && !Array.isArray(m.api) ? m.api as Record<string, unknown> : null;
+      const api = !!apiConfig;
+      const apiPath = typeof apiConfig?.path === "string" ? apiConfig.path : "";
       let missing = cli && !path;
       if (path) { try { missing = !statSync(resolve(dir, path)).isFile(); } catch { missing = true; } }
       const cliConfig = m.cli && typeof m.cli === "object" && !Array.isArray(m.cli) ? m.cli as Record<string, unknown> : null;
       found.set(m.name, {
         name: m.name, version: m.version, tier, dir, enabled: !disabled.has(m.name), cli, api, missing,
         command: cliConfig ? (typeof cliConfig.command === "string" && cliConfig.command ? cliConfig.command : m.name) : "",
+        aliases: Array.isArray(cliConfig?.aliases) ? cliConfig.aliases.filter((a: unknown): a is string => typeof a === "string" && !!a) : [],
         entry: path ? resolve(dir, path) : "", runtime: typeof m.runtime === "string" ? m.runtime : "",
-        target: typeof m.target === "string" ? m.target : "", interactive: cliConfig?.interactive === true,
+        target: typeof m.target === "string" ? m.target : "", interactive: cliConfig?.interactive === true, apiPath,
       });
     } catch { console.error(`maw: skipped invalid plugin.json: ${safePath(dir)}`); }
   }
