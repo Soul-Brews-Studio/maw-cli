@@ -1,10 +1,10 @@
-export async function execute(path: string, args: string[]): Promise<number> {
+export async function execute(path: string, args: string[], env?: Record<string, string>): Promise<number> {
   try {
     const child = Bun.spawn([path, ...args], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
-      env: process.env,
+      env: env ? { ...process.env, ...env } : process.env,
     });
     let interrupted = false;
     const interrupt = () => {
