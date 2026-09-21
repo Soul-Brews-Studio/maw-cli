@@ -1,11 +1,12 @@
 import { safePath } from "./mod.safePath";
+import { formatPluginTable } from "./mod.formatPluginTable";
 import type { InstalledPlugin } from "./types";
 
 export function formatPluginInventory(plugins: InstalledPlugin[], verbose: boolean, all: boolean): string {
   if (!plugins.length) return "no plugins installed\n";
   const active = plugins.filter(p => p.enabled).length, disabled = plugins.length - active;
   const visible = plugins.filter(p => all || p.enabled);
-  if (verbose) return visible.map(p => `${p.name}\t${p.version}\t${p.tier}\t${p.enabled ? "enabled" : "disabled"}\t${safePath(p.dir)}\n`).join("");
+  if (verbose) return visible.length ? formatPluginTable(visible) : "";
   const count = (tier: string) => visible.filter(p => p.tier === tier).length;
   const missing = visible.filter(p => p.missing).length;
   const health = missing ? `${missing} missing executable${missing === 1 ? "" : "s"}` : "ok";

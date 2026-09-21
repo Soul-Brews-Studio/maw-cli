@@ -136,6 +136,28 @@ grep -q '^stdin=hello stdin$' "$tmp/out"
 grep -q '^probe stderr$' "$tmp/err"
 printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin argv/streams/exit OK\n'
 
+# plugin ls -v renders the maw-rs table: tier sections, per-section column
+# widths measured on the raw cell (escapes included, as maw-rs does), and a
+# trailing active count.
+mkdir -p "$tmp/home/.maw/plugins/demo"
+cat > "$tmp/home/.maw/plugins/demo/plugin.json" <<'PLUGINJSON'
+{"name":"demo","version":"1.2.3","tier":"extra","entry":"index.ts","runtime":"bun-dev","target":"js","cli":{"command":"demo","interactive":true}}
+PLUGINJSON
+: > "$tmp/home/.maw/plugins/demo/index.ts"
+run plugin ls -v > "$tmp/plv" 2>"$tmp/plv-err" || fail "plugin ls -v exit"
+# Only the JS port renders the maw-rs table today; probe rather than hardcode a
+# port, so this starts covering go/rs/zig the moment they render it too.
+if grep -q 'extra.*(1)' "$tmp/plv"; then
+grep -q '^name  *version  *tier  *surfaces  *dir' "$tmp/plv" || fail 'plugin ls -v must print a header row'
+grep -q '^─' "$tmp/plv" || fail 'plugin ls -v must print a separator row'
+grep -q 'cli:demo' "$tmp/plv" || fail 'plugin ls -v must print the surfaces column'
+grep -q '^1 active$' "$tmp/plv" || fail 'plugin ls -v must end with the active count'
+    printf 'smoke: plugin ls -v table sections, header/separator, surfaces, active count OK\n'
+else
+    printf 'smoke: plugin ls -v table not rendered by this port, skipped\n'
+fi
+rm -rf "$tmp/home/.maw/plugins/demo'
+
 # locate: registry read is isolated to MAW_HOME and must never require tmux.
 # Only the JS port implements it today; probe root help rather than hardcoding a
 # port, so this block starts covering go/rs/zig the moment they register it.
