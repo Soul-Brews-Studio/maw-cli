@@ -102,9 +102,11 @@ sys.exit(7)
     disabled.unlink()
 
     for name, fields in (("module", dict(cli=dict(command="module"))),
-                         ("wasm", dict(target="wasm")), ("runtime", dict(runtime="other"))):
+                         ("runtime", dict(runtime="other")), ("targetless", dict(target=None))):
         manifest(name, name, **fields)
-        assert "not a standalone Bun CLI" in run([name], 126).stderr
+        marker.unlink(missing_ok=True)
+        run([name], 7)
+        assert marker.exists(), name
     manifest("missing", "missing", entry="missing.mjs")
     manifest("directory", "directory", entry=".")
     for name in ("missing", "directory"):
@@ -120,14 +122,15 @@ sys.exit(7)
     path_probe = binaries / "maw-probe"
     path_probe.write_text("#!/bin/sh\nprintf 'PATH wins\\n'\n")
     path_probe.chmod(0o755)
+    marker.unlink(missing_ok=True)
     assert run(["probe"]).stdout == "PATH wins\n"
     path_probe.unlink()
     assert not marker.exists()
 
     runtime.chmod(0o644)
-    assert "requires bun on PATH" in run(["probe"], 126).stderr
+    assert "no maw-js/Bun fallback" in run(["probe"], 2).stderr
     runtime.chmod(0o755)
-    assert "requires bun on PATH" in run(["probe"], 126, dict(PATH="bin")).stderr
+    assert "no maw-js/Bun fallback" in run(["probe"], 2, dict(PATH="bin")).stderr
     assert not marker.exists()
     runtime_source = runtime.read_text()
     runtime.write_text("#!/nonexistent-maw-dispatch-interpreter\n")

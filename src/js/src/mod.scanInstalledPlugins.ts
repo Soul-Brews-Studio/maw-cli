@@ -46,6 +46,7 @@ export function scanInstalledPlugins(root: string, disabled: Set<string>): Insta
       found.set(m.name, {
         name: m.name, version: m.version, tier, dir, enabled: !disabled.has(m.name), cli, api, missing,
         command: cliConfig ? (typeof cliConfig.command === "string" && cliConfig.command ? cliConfig.command : m.name) : "",
+        aliases: Array.isArray(cliConfig?.aliases) ? cliConfig.aliases.filter((a: unknown): a is string => typeof a === "string" && !!a) : [],
         entry: path ? resolve(dir, path) : "", runtime: typeof m.runtime === "string" ? m.runtime : "",
         target: typeof m.target === "string" ? m.target : "", interactive: cliConfig?.interactive === true, apiPath,
       });

@@ -70,10 +70,9 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
 
     before = snapshot()
     expected = ("4 plugins (3 active, 1 disabled)\n"
-                "  core: 1 · standard: 2 · extra: 0\n"
-                "  cli: 3 · api: 1 · health: 1 missing executable\n"
-                "  alpha · beta · gamma\n"
-                "  disabled hidden by default — use --all to include\n")
+                "  core: 2 · standard: 2 · extra: 0\n"
+                "  cli: 4 · api: 1 · health: 1 missing executable\n"
+                "  alpha · off (disabled) · beta · gamma (no executable)\n")
     for args in (["plugin", "ls"], ["plugins", "ls"], ["plugins"]):
         result = run(args)
         assert result.stdout == expected, (args, result.stdout)
@@ -83,19 +82,17 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
     # then an active count. Assert the shape, not a hand-built string.
     for args in (["plugin", "ls", "-v"], ["plugins", "ls", "--verbose"], ["plugins", "-v"]):
         table = run(args).stdout
-        assert "\x1b[1mcore\x1b[0m (1)" in table, table
+        assert "\x1b[1mcore\x1b[0m (2)" in table, table
         assert "\x1b[1mstandard\x1b[0m (2)" in table, table
         assert "name  " in table and "\u2500" in table, table
         assert "cli:alpha" in table and alpha.name in table, table
-        assert table.endswith("\n3 active\n"), table
-        assert "disabled" not in table, table
-    all_table = run(["plugin", "ls", "--all", "-v"]).stdout
-    assert "\x1b[90m\u25cb\x1b[0m disabled" in all_table, all_table
-    assert off.name in all_table, all_table
-    assert all_table.endswith("3 active. 1 disabled \u2014 use 'maw plugin ls --all' to see them.\n"), all_table
+        assert "\x1b[90m\u25cb\x1b[0m disabled" in table, table
+        assert off.name in table, table
+        assert table.endswith("3 active. 1 disabled \u2014 use 'maw plugin ls --all' to see them.\n"), table
     all_summary = run(["plugin", "ls", "--all"]).stdout
     assert "core: 2 · standard: 2 · extra: 0" in all_summary
-    assert "cli: 4 · api: 1" in all_summary and "alpha · off · beta · gamma" in all_summary
+    assert "cli: 4 · api: 1" in all_summary
+    assert "alpha · off (disabled) · beta · gamma (no executable)" in all_summary
     for args in (["plugin"], ["plugin", "ls", "extra"], ["plugin", "ls", "--wat"],
                  ["plugins", "install"], ["plugin", "ls", "-v", "-v"]):
         assert "usage:" in run(args, status=2).stderr
@@ -170,7 +167,8 @@ with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
     custom = root / "custom"
     custom.mkdir()
     write(custom / "maw.config.json", {"disabledPlugins": ["alpha", "beta", "gamma", "off"]})
-    assert run(["plugin", "ls", "-v"], {"MAW_CONFIG_DIR": str(custom)}).stdout == ""
+    all_disabled = run(["plugin", "ls", "-v"], {"MAW_CONFIG_DIR": str(custom)}).stdout
+    assert all_disabled.endswith("0 active. 4 disabled \u2014 use 'maw plugin ls --all' to see them.\n"), all_disabled
     assert "4 disabled" in run(["plugin", "ls"], {"XDG_CONFIG_HOME": str(custom.parent), "MAW_CONFIG_DIR": str(custom)}).stdout
     (custom / "maw.config.json").write_text("{")
     assert not run(["plugin", "ls"], {"MAW_CONFIG_DIR": str(custom)}, status=1).stdout
