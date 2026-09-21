@@ -6,6 +6,8 @@ export type Command = {
   run: (args: string[]) => number | Promise<number>;
 };
 
+export type Oracle = { name: string; org: string; repo: string; localPath: string };
+
 export type InstalledPlugin = {
   name: string; version: string; tier: "core" | "standard" | "extra";
   dir: string; enabled: boolean; cli: boolean; api: boolean; missing: boolean;
