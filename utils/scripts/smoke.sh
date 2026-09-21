@@ -206,7 +206,7 @@ if run default >/dev/null 2>&1; then
     [ "$(run default)" = 'none' ] || fail 'default must report none when unset'
     mkdir -p "$tmp/home/.maw/plugins/router"
     cat > "$tmp/home/.maw/plugins/router/plugin.json" <<'ROUTER'
-{"name":"router","version":"1.0.0","tier":"extra","entry":"index.ts","runtime":"bun-dev","target":"js","cli":{"command":"router","interactive":true}}
+{"name":"router","version":"1.0.0","tier":"extra","entry":"index.ts","runtime":"bun-dev","target":"js","cli":{"command":"router","interactive":true,"help":"maw router <alpha|beta> — fixture"}}
 ROUTER
     : > "$tmp/home/.maw/plugins/router/index.ts"
     cat > "$tmp/plugins/bun" <<'FAKEBUN'
@@ -220,6 +220,7 @@ FAKEBUN
     [ "$(run default)" = 'router' ] || fail 'default must report the configured plugin'
     [ "$(run made-up-verb)" = 'routed:made-up-verb' ] || fail 'unmatched verb must route to the default'
     run --help | grep -q '^Default: router' || fail 'help must disclose the routing'
+    run --help | grep -q 'via router:.*alpha.*beta' || fail 'help must list the default plugin verbs'
     run plugin ls >/dev/null || fail 'built-ins must still win over the default'
     [ "$(run version)" != 'routed:version' ] || fail 'default must not shadow a built-in'
     status=0; run default set nosuch >/dev/null 2>&1 || status=$?
