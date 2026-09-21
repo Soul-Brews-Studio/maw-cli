@@ -136,6 +136,42 @@ grep -q '^stdin=hello stdin$' "$tmp/out"
 grep -q '^probe stderr$' "$tmp/err"
 printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin argv/streams/exit OK\n'
 
+# locate: registry read is isolated to MAW_HOME and must never require tmux.
+mkdir -p "$tmp/home/.maw"
+cat > "$tmp/home/.maw/oracles.json" <<'REGISTRY'
+{"oracles":[
+ {"name":"alpha","org":"acme","repo":"alpha-oracle","local_path":"/checkouts/alpha"},
+ {"name":"alphabet","org":"acme","repo":"alphabet-oracle","local_path":"/checkouts/alphabet"},
+ {"name":"dup","org":"one","repo":"dup-oracle","local_path":"/checkouts/one-dup"},
+ {"name":"dup","org":"two","repo":"dup-oracle","local_path":"/checkouts/two-dup"}
+]}
+REGISTRY
+[ "$(run locate alpha --path)" = '/checkouts/alpha' ] || fail 'locate exact name'
+[ "$(run locate acme/alphabet-oracle --path)" = '/checkouts/alphabet' ] || fail 'locate org/repo slug'
+[ "$(run locate alphab --path)" = '/checkouts/alphabet' ] || fail 'locate unique prefix'
+[ "$(run locate two/dup-oracle --path)" = '/checkouts/two-dup' ] || fail 'locate disambiguates by slug'
+run locate alpha --json > "$tmp/locate-json"
+grep -q '"local_path":"/checkouts/alpha"' "$tmp/locate-json" || fail 'locate --json shape'
+for invalid in '' 'alpha --path --json' 'alpha --bogus'; do
+    status=0
+    # shellcheck disable=SC2086
+    run locate $invalid > "$tmp/out" 2> "$tmp/err" || status=$?
+    [ "$status" -eq 2 ] || fail "locate usage exit: '$invalid': $status"
+done
+status=0
+run locate dup > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 1 ] || fail "locate ambiguous exit: $status"
+grep -q 'matches 2 oracles' "$tmp/err" || fail 'locate ambiguous must list candidates'
+status=0
+run locate absent > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 1 ] || fail "locate miss exit: $status"
+rm -f "$tmp/home/.maw/oracles.json"
+status=0
+run locate alpha > "$tmp/out" 2> "$tmp/err" || status=$?
+[ "$status" -eq 1 ] || fail "locate missing registry exit: $status"
+grep -q '0 registered' "$tmp/err" || fail 'locate missing registry must report an empty registry'
+printf 'smoke: locate name/slug/prefix tiers, ambiguity, usage, missing registry OK\n'
+
 if [ -n "$entry" ]; then
     python3 utils/scripts/plugin-smoke.py -- "$maw" "$entry"
     python3 utils/scripts/dispatch-smoke.py -- "$maw" "$entry"

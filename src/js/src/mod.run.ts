@@ -8,6 +8,7 @@ import { help } from "./mod.help";
 import { showVersion } from "./mod.showVersion";
 import { pluginLifecycle } from "./mod.pluginLifecycle";
 import { marketplace } from "./mod.marketplace";
+import { locate } from "./mod.locate";
 import type { Command } from "./types";
 
 export async function run(args: string[]): Promise<number> {
@@ -26,6 +27,11 @@ export async function run(args: string[]): Promise<number> {
     run: (args) => pluginLifecycle(args, true),
   });
   registry.set("marketplace", { name: "marketplace", summary: "List known plugin sources", usage: "maw marketplace [ls|list]", run: marketplace });
+  registry.set("locate", {
+    name: "locate", summary: "Resolve a registered oracle to its local checkout",
+    usage: "maw locate <oracle> [--path | --json] [--no-remote]",
+    run: locate,
+  });
   for (const [name, path] of discover()) {
     if (registry.has(name)) continue;
     registry.set(name, { name, path, summary: "External plugin", run: (args) => execute(path, args) });
