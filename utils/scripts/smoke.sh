@@ -137,6 +137,9 @@ grep -q '^probe stderr$' "$tmp/err"
 printf 'smoke: help, version, plugin ls aliases/collisions, discovery, plugin argv/streams/exit OK\n'
 
 # locate: registry read is isolated to MAW_HOME and must never require tmux.
+# Only the JS port implements it today; probe root help rather than hardcoding a
+# port, so this block starts covering go/rs/zig the moment they register it.
+if grep -q '^  locate[[:space:]]' "$tmp/help"; then
 mkdir -p "$tmp/home/.maw"
 cat > "$tmp/home/.maw/oracles.json" <<'REGISTRY'
 {"oracles":[
@@ -171,6 +174,9 @@ run locate alpha > "$tmp/out" 2> "$tmp/err" || status=$?
 [ "$status" -eq 1 ] || fail "locate missing registry exit: $status"
 grep -q '0 registered' "$tmp/err" || fail 'locate missing registry must report an empty registry'
 printf 'smoke: locate name/slug/prefix tiers, ambiguity, usage, missing registry OK\n'
+else
+    printf 'smoke: locate not registered by this port, skipped\n'
+fi
 
 if [ -n "$entry" ]; then
     python3 utils/scripts/plugin-smoke.py -- "$maw" "$entry"
