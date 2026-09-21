@@ -26,12 +26,13 @@ export function locate(args: string[]): number {
 
   const resolution = resolveOracle(oracles, target);
   if (resolution.kind === "ambiguous") {
+    const shown = resolution.candidates.slice(0, 10);
+    const width = Math.max(...shown.map(candidate => candidate.name.length));
     console.error(`maw: '${safePath(target)}' matches ${resolution.candidates.length} oracles:`);
-    for (const candidate of resolution.candidates.slice(0, 10)) {
-      console.error(`    ${candidate.name}\t${candidate.org}/${candidate.repo}`);
+    for (const candidate of shown) {
+      console.error(`    ${candidate.name.padEnd(width)}  maw locate ${candidate.org}/${candidate.repo}`);
     }
     if (resolution.candidates.length > 10) console.error(`    … ${resolution.candidates.length - 10} more`);
-    console.error("  name one exactly, or use <org>/<repo>");
     return 1;
   }
   if (resolution.kind === "none") {
