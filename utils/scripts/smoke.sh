@@ -156,7 +156,7 @@ grep -q '^1 active$' "$tmp/plv" || fail 'plugin ls -v must end with the active c
 else
     printf 'smoke: plugin ls -v table not rendered by this port, skipped\n'
 fi
-rm -rf "$tmp/home/.maw/plugins/demo'
+rm -rf "$tmp/home/.maw/plugins/demo"
 
 # locate: registry read is isolated to MAW_HOME and must never require tmux.
 # Only the JS port implements it today; probe root help rather than hardcoding a
@@ -198,6 +198,43 @@ grep -q '0 registered' "$tmp/err" || fail 'locate missing registry must report a
 printf 'smoke: locate name/slug/prefix tiers, ambiguity, usage, missing registry OK\n'
 else
     printf 'smoke: locate not registered by this port, skipped\n'
+fi
+
+# default: route unmatched verbs to a plugin, without shadowing what already
+# resolves. Probe support so ports lacking the command skip.
+if run default >/dev/null 2>&1; then
+    [ "$(run default)" = 'none' ] || fail 'default must report none when unset'
+    mkdir -p "$tmp/home/.maw/plugins/router"
+    cat > "$tmp/home/.maw/plugins/router/plugin.json" <<'ROUTER'
+{"name":"router","version":"1.0.0","tier":"extra","entry":"index.ts","runtime":"bun-dev","target":"js","cli":{"command":"router","interactive":true}}
+ROUTER
+    : > "$tmp/home/.maw/plugins/router/index.ts"
+    cat > "$tmp/plugins/bun" <<'FAKEBUN'
+#!/bin/sh
+shift
+printf 'routed:%s\n' "$*"
+FAKEBUN
+    chmod +x "$tmp/plugins/bun"
+    run default set router > "$tmp/dset" || fail 'default set exit'
+    grep -q '^default: router' "$tmp/dset" || fail 'default set must confirm the plugin'
+    [ "$(run default)" = 'router' ] || fail 'default must report the configured plugin'
+    [ "$(run made-up-verb)" = 'routed:made-up-verb' ] || fail 'unmatched verb must route to the default'
+    run --help | grep -q '^Default: router' || fail 'help must disclose the routing'
+    run plugin ls >/dev/null || fail 'built-ins must still win over the default'
+    [ "$(run version)" != 'routed:version' ] || fail 'default must not shadow a built-in'
+    status=0; run default set nosuch >/dev/null 2>&1 || status=$?
+    [ "$status" -eq 1 ] || fail "default set must refuse an unknown plugin: $status"
+    for invalid in 'bogus' 'set'; do
+        status=0
+        run default $invalid >/dev/null 2>&1 || status=$?
+        [ "$status" -eq 2 ] || fail "default usage exit: '$invalid': $status"
+    done
+    run default unset >/dev/null || fail 'default unset exit'
+    [ "$(run default)" = 'none' ] || fail 'default unset must clear the routing'
+    rm -rf "$tmp/home/.maw/plugins/router"
+    printf 'smoke: default set/show/unset, routing, built-in precedence, help disclosure OK\n'
+else
+    printf 'smoke: default not implemented by this port, skipped\n'
 fi
 
 if [ -n "$entry" ]; then
