@@ -57,10 +57,12 @@ sys.exit(7)
                      entry="", artifact=dict(path="entry.mjs"))
 
     def run(args, code=0, changes=None, stdin=""):
+        # code=None probes without asserting, for capability detection.
         current = env | (changes or {})
         result = subprocess.run(command + args, env=current, cwd=root, input=stdin,
                                 text=True, capture_output=True, timeout=10)
-        assert result.returncode == code, (args, result.returncode, result.stdout, result.stderr)
+        if code is not None:
+            assert result.returncode == code, (args, result.returncode, result.stdout, result.stderr)
         return result
 
     for args in ([], ["help"], ["--help"], ["version"], ["plugin", "ls"], ["plugin", "ls", "-v"]):
@@ -101,9 +103,14 @@ sys.exit(7)
     run(["version"])
     disabled.unlink()
 
+    manifest("module", "module", cli=dict(command="module"))
+    permissive = "not a standalone Bun CLI" not in run(["module"], None).stderr
     for name, fields in (("module", dict(cli=dict(command="module"))),
                          ("runtime", dict(runtime="other")), ("targetless", dict(target=None))):
         manifest(name, name, **fields)
+        if not permissive:
+            assert "not a standalone Bun CLI" in run([name], 126).stderr
+            continue
         marker.unlink(missing_ok=True)
         run([name], 7)
         assert marker.exists(), name
@@ -128,9 +135,15 @@ sys.exit(7)
     assert not marker.exists()
 
     runtime.chmod(0o644)
-    assert "no maw-js/Bun fallback" in run(["probe"], 2).stderr
+    if permissive:
+        assert "no maw-js/Bun fallback" in run(["probe"], 2).stderr
+    else:
+        assert "requires bun on PATH" in run(["probe"], 126).stderr
     runtime.chmod(0o755)
-    assert "no maw-js/Bun fallback" in run(["probe"], 2, dict(PATH="bin")).stderr
+    if permissive:
+        assert "no maw-js/Bun fallback" in run(["probe"], 2, dict(PATH="bin")).stderr
+    else:
+        assert "requires bun on PATH" in run(["probe"], 126, dict(PATH="bin")).stderr
     assert not marker.exists()
     runtime_source = runtime.read_text()
     runtime.write_text("#!/nonexistent-maw-dispatch-interpreter\n")
