@@ -252,3 +252,17 @@ else
     python3 utils/scripts/dispatch-smoke.py -- "$maw"
     python3 utils/scripts/lifecycle-smoke.py -- "$maw"
 fi
+
+# update: probe root help so ports without it skip. The fixture compiles its own
+# overlay executables from source and replaces only copies in a temporary tree,
+# so it runs here for the source-run js port (bun ENTRY). Go runs the same
+# script from its own task/CI step; a release binary has no source to overlay.
+if grep -q '^  update[[:space:]]' "$tmp/help"; then
+    if [ -n "$entry" ]; then
+        python3 utils/scripts/update-smoke.py -- "$maw" "$entry"
+    else
+        printf 'smoke: update fixture runs from the port task (python3 utils/scripts/update-smoke.py), skipped here\n'
+    fi
+else
+    printf 'smoke: update not registered by this port, skipped\n'
+fi

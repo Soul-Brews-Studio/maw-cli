@@ -61,3 +61,48 @@ read-only checks, malformed/corrupt payloads, candidate proof failure and
 source/downgrade decisions with an empty runtime PATH. No unit framework.
 
 Source ancestry API: [GitHub compare-two-commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
+
+## js port (`maw-js update`)
+
+```sh
+maw-js update --check
+maw-js update
+maw-js update --version v26.9.28-alpha.348
+```
+
+A port of the contract above, command for command, using only Bun/Node
+built-ins (`fetch`, `node:zlib`, `node:crypto`) and a hand-written tar reader.
+Same selection, `current`/`target`/`commit`/`status`/`updated` lines, size
+limits, redirect-host allowlist, 90 s download and 3 min overall deadlines,
+exact-member archive rules (`maw-js` and `RELEASE.json` only, metadata
+`language` `js`), candidate `version` proof and single same-directory rename.
+Differences, all deliberate:
+
+- `release.json` must also carry `skip: false`, as every published plan does.
+- maw-js embeds only a release tag or `dev`, so there is no pseudo-version or
+  Go companion-tag branch; any other embedded string is reported as unrecognized.
+- Only a standalone executable replaces itself. A script run (`bun cli.ts`,
+  `bun link`, `bun add --global`) has the bun runtime as its `process.execPath`
+  and is refused before any download, whatever version it reports.
+- A `dev` build refuses to replace anything. From a git checkout of this
+  repository it prints the fix with the real path instead, adding
+  `switch alpha` when on another branch and saying when the tree is dirty
+  (read-only: `git symbolic-ref` and `git status --porcelain`):
+
+  ```
+  maw: update: this maw runs from a source checkout; update it with git
+    git -C /path/to/maw-cli switch alpha
+    git -C /path/to/maw-cli pull --ff-only
+  ```
+
+  Outside a checkout it prints the `bun add --global` reinstall command.
+  `--check` still reports release status from any `dev` build.
+- Every failure ends with a copy-pasteable command that fixes or narrows it
+  (for example the `curl -sSIL` of the URL that failed, or the stale lock's `rmdir`).
+
+`python3 utils/scripts/update-smoke.py -- BUN ENTRY` (run by `smoke.sh` for the
+source-run js port) copies `src/js/src` into a throwaway git checkout, rewrites
+only the origins there, compiles fixture executables with `bun build --compile`
+and serves releases over local TLS, the same overlay approach as Go. It replaces
+only copies in a temporary directory and never runs `--check` through the real
+ENTRY, which would reach GitHub.
