@@ -79,6 +79,8 @@ const Context = struct {
             if (v.object.get("artifact")) |artifact| entry = text(artifact, "path");
         }
         if (entry.len == 0) entry = text(v, "wasm");
+        // A single leading "./" names the same in-tree file; most plugins write it (#43).
+        if (std.mem.startsWith(u8, entry, "./")) entry = entry[2..];
         if (entry.len == 0 or std.fs.path.isAbsolute(entry) or std.mem.indexOfScalar(u8, entry, '\\') != null) return error.UnsafeEntry;
         for (entry) |b| if (b < 32 or b == 127) return error.UnsafeEntry;
         var parts = std.mem.splitScalar(u8, entry, '/');
