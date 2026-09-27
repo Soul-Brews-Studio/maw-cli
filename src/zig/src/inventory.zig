@@ -2,7 +2,7 @@ const std = @import("std");
 const V = std.json.Value;
 const Object = std.json.ObjectMap;
 const tiers = [_][]const u8{ "core", "standard", "extra" };
-const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool, command: []const u8, runtime: []const u8, target: []const u8, interactive: bool, entry: []const u8 };
+const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool, command: []const u8, runtime: []const u8, target: []const u8, interactive: bool, entry: []const u8, aliases: []const []const u8 = &.{} };
 const Config = struct { path: []const u8, name: []const u8, weight: []const u8, local: bool };
 const Context = struct {
     a: std.mem.Allocator,
@@ -139,15 +139,22 @@ const Context = struct {
         const cli = isObject(m.get("cli")) or entry.len > 0;
         var command: []const u8 = "";
         var interactive = false;
+        var aliases: std.ArrayList([]const u8) = .empty;
         if (m.get("cli")) |value| {
             if (value == .object) {
                 command = string(value.object, "command");
                 if (command.len == 0) command = name;
                 if (value.object.get("interactive")) |flag| interactive = flag == .bool and flag.bool;
+                // cli.aliases: dispatch names tried after every command (#55).
+                if (value.object.get("aliases")) |list| {
+                    if (list == .array) for (list.array.items) |item| {
+                        if (item == .string and item.string.len > 0) try aliases.append(c.a, item.string);
+                    };
+                }
             }
         }
         const absolute_entry = if (entry.len == 0) "" else try c.join(&.{ dir, entry });
-        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(absolute_entry), .command = command, .runtime = string(m, "runtime"), .target = string(m, "target"), .interactive = interactive, .entry = absolute_entry };
+        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(absolute_entry), .command = command, .runtime = string(m, "runtime"), .target = string(m, "target"), .interactive = interactive, .entry = absolute_entry, .aliases = try aliases.toOwnedSlice(c.a) };
     }
     fn scan(c: Context, root: []const u8, off: std.StringHashMap(void)) ![]Plugin {
         const overrides = (try c.read(try c.join(&.{ root, ".overrides.json" }))) orelse Object.empty;
@@ -288,39 +295,86 @@ pub fn resolve(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ
     };
 }
 
+// The plugin a verb names (#55): one whose command (cli.command, else its
+// manifest name) it is, first in inventory order, and only then one declaring it
+// in cli.aliases, so an alias never shadows a command. Built-ins and PATH
+// executables were already tried by the caller. An alias that more than one
+// enabled plugin declares resolves to none of them: dispatch names every holder
+// and the command that runs each. A disabled holder answers only when no enabled
+// one does.
+fn pick(c: Context, plugins: []const Plugin, name: []const u8, args: []const []const u8) !union(enum) { plugin: Plugin, ambiguous, none } {
+    for (plugins) |p| {
+        if (eql(p.command, name)) return .{ .plugin = p };
+    }
+    var enabled: std.ArrayList(Plugin) = .empty;
+    var disabled: ?Plugin = null;
+    for (plugins) |p| {
+        for (p.aliases) |alias| {
+            if (!eql(alias, name)) continue;
+            if (p.enabled) try enabled.append(c.a, p) else if (disabled == null) disabled = p;
+            break;
+        }
+    }
+    if (enabled.items.len == 1) return .{ .plugin = enabled.items[0] };
+    if (enabled.items.len == 0) return if (disabled) |p| .{ .plugin = p } else .none;
+    var names: std.ArrayList([]const u8) = .empty;
+    var commands: std.ArrayList(u8) = .empty;
+    for (enabled.items) |p| {
+        try names.append(c.a, p.name);
+        try commands.appendSlice(c.a, try std.fmt.allocPrint(c.a, "  maw {s}", .{p.command}));
+        for (args) |arg| {
+            try commands.append(c.a, ' ');
+            try commands.appendSlice(c.a, try shellQuote(c, arg));
+        }
+        try commands.append(c.a, '\n');
+    }
+    try c.out(.stderr(), "maw: \"{s}\" is an alias of {d} plugins ({s}); neither runs. Run one by name:\n{s}", .{ name, enabled.items.len, try std.mem.join(c.a, ", ", names.items), commands.items });
+    return .ambiguous;
+}
+
+// Quote one word for a copy-pasteable sh command line.
+fn shellQuote(c: Context, word: []const u8) ![]const u8 {
+    var safe = word.len > 0;
+    for (word) |b| {
+        if (!std.ascii.isAlphanumeric(b) and std.mem.indexOfScalar(u8, "_@%+=:,./-", b) == null) safe = false;
+    }
+    if (safe) return word;
+    return std.fmt.allocPrint(c.a, "'{s}'", .{try std.mem.replaceOwned(u8, c.a, word, "'", "'\\''")});
+}
+
 fn resolveInstalled(c: Context, name: []const u8, args: []const []const u8) !?Dispatch {
     const locations = try c.paths();
     const off = try c.disabled(locations.config);
-    for (try c.scan(locations.plugins, off)) |p| {
-        if (!eql(p.command, name)) continue;
-        if (!p.enabled) {
-            try c.out(.stderr(), "maw: plugin {s} is disabled\n", .{p.name});
-            return Dispatch{ .failure = 1 };
-        }
-        // Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
-        if (args.len == 1 and (eql(args[0], "version") or eql(args[0], "--version"))) {
-            try c.out(.stdout(), "{s} {s} ({s})\n", .{ p.name, p.version, shortCommit(c, p.dir) orelse "not a Git checkout" });
-            return .answered;
-        }
-        if (!eql(p.runtime, "bun-dev") or !eql(p.target, "js") or !p.interactive) {
-            try c.out(.stderr(), "maw: plugin {s} is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)\n", .{p.name});
-            return Dispatch{ .failure = 126 };
-        }
-        if (p.entry.len == 0 or !c.regular(p.entry)) {
-            try c.out(.stderr(), "maw: plugin {s} entry is missing or not a regular file\n", .{p.name});
-            return Dispatch{ .failure = 126 };
-        }
-        const bun = try findBun(c) orelse {
-            try c.out(.stderr(), "maw: plugin {s} requires bun on PATH\n", .{p.name});
-            return Dispatch{ .failure = 126 };
-        };
-        const argv = try c.a.alloc([]const u8, args.len + 2);
-        argv[0] = bun;
-        argv[1] = p.entry;
-        @memcpy(argv[2..], args);
-        return Dispatch{ .argv = argv };
+    const picked = try pick(c, try c.scan(locations.plugins, off), name, args);
+    if (picked == .ambiguous) return Dispatch{ .failure = 2 };
+    if (picked == .none) return null;
+    const p = picked.plugin;
+    if (!p.enabled) {
+        try c.out(.stderr(), "maw: plugin {s} is disabled\n", .{p.name});
+        return Dispatch{ .failure = 1 };
     }
-    return null;
+    // Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
+    if (args.len == 1 and (eql(args[0], "version") or eql(args[0], "--version"))) {
+        try c.out(.stdout(), "{s} {s} ({s})\n", .{ p.name, p.version, shortCommit(c, p.dir) orelse "not a Git checkout" });
+        return .answered;
+    }
+    if (!eql(p.runtime, "bun-dev") or !eql(p.target, "js") or !p.interactive) {
+        try c.out(.stderr(), "maw: plugin {s} is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)\n", .{p.name});
+        return Dispatch{ .failure = 126 };
+    }
+    if (p.entry.len == 0 or !c.regular(p.entry)) {
+        try c.out(.stderr(), "maw: plugin {s} entry is missing or not a regular file\n", .{p.name});
+        return Dispatch{ .failure = 126 };
+    }
+    const bun = try findBun(c) orelse {
+        try c.out(.stderr(), "maw: plugin {s} requires bun on PATH\n", .{p.name});
+        return Dispatch{ .failure = 126 };
+    };
+    const argv = try c.a.alloc([]const u8, args.len + 2);
+    argv[0] = bun;
+    argv[1] = p.entry;
+    @memcpy(argv[2..], args);
+    return Dispatch{ .argv = argv };
 }
 
 // The short commit of the Git work tree a plugin directory lies in, for

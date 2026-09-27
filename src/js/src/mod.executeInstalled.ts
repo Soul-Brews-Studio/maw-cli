@@ -7,6 +7,8 @@ import { scanInstalledPlugins } from "./mod.scanInstalledPlugins";
 import { findBun } from "./mod.findBun";
 import { execute } from "./mod.execute";
 import { pluginCommit } from "./mod.pluginCommit";
+import { resolveInstalled } from "./mod.resolveInstalled";
+import { shellQuote } from "./mod.shellQuote";
 
 // Two plugin shapes exist in the wild. Script-style plugins do their work at
 // import time; SDK-style ones export a handler and do nothing until it is
@@ -29,8 +31,12 @@ export async function executeInstalled(name: string, args: string[]): Promise<nu
   try {
     const paths = inventoryPaths();
     const plugins = scanInstalledPlugins(paths.plugins, disabledPlugins(paths.config));
-    const plugin = plugins.find(candidate => candidate.cli
-      && (candidate.command === name || candidate.aliases.includes(name)));
+    const { plugin, ambiguous } = resolveInstalled(plugins, name);
+    if (ambiguous.length) {
+      console.error(`maw: ${JSON.stringify(name)} is an alias of ${ambiguous.length} plugins (${ambiguous.map(p => p.name).join(", ")}); neither runs. Run one by name:\n`
+        + ambiguous.map(p => `  ${["maw", p.command, ...args.map(shellQuote)].join(" ")}`).join("\n"));
+      return 2;
+    }
     if (!plugin) return;
     if (!plugin.enabled) {
       console.error(`maw: plugin ${plugin.name} is disabled`);

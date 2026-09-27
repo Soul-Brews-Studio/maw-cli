@@ -172,6 +172,90 @@ sys.exit(7)
     git_link.unlink()
     answers(["checkout", "version"], "checkout 3.0.0 (not a Git checkout)")
 
+    # Plugin aliases (#55). After built-ins and PATH, a verb names an installed
+    # plugin by its command (cli.command, else the manifest name) and only then by
+    # a declared cli.aliases entry. An alias never shadows a built-in, a PATH
+    # executable, a reserved host name or another plugin's command. An alias two
+    # enabled plugins declare runs neither: dispatch names both and ends with the
+    # command that runs each by name. Every case runs and failures are collected,
+    # so a port without aliases reports each case it fails, not just the first.
+    atlas = manifest("atlas", "atlas", version="9.1.0", cli=dict(command="atlas", interactive=True, aliases=["at"]))
+    later = manifest("later", "later")
+    manifest("early", "early", cli=dict(command="early", interactive=True,
+                                        aliases=[7, "", None, "version", "shadowed", "zig", "later"]))
+    dup_one = manifest("dup-one", "dup-one", cli=dict(command="dup-one", interactive=True, aliases=["dup"]))
+    manifest("dup-two", "dup-two", cli=dict(command="dup-two", interactive=True, aliases=["dup"]))
+    alias_config = config / "maw.config.10.json"
+    alias_failures = []
+
+    def alias_case(label, check):
+        try:
+            check()
+        except AssertionError as error:
+            alias_failures.append(f"{label}: {str(error)[:600]}")
+        marker.unlink(missing_ok=True)
+        alias_config.unlink(missing_ok=True)
+
+    def alias_dispatch():
+        result = run(["at"] + passthrough, 7, stdin="alias stdin\n")
+        assert json.loads(result.stdout) == dict(argv=[str(atlas / "entry.mjs")] + passthrough,
+            stdin="alias stdin\n", cwd=str(root.resolve()), value="unchanged"), result.stdout
+        assert result.stderr == "plugin stderr\n", result.stderr
+        for args in (["at", "--help"], ["help", "at"]):
+            assert json.loads(run(args, 7).stdout)["argv"] == [str(atlas / "entry.mjs"), "--help"], args
+
+    def alias_version():
+        for verb in ("version", "--version"):
+            answers(["at", verb], "atlas 9.1.0 (not a Git checkout)")
+
+    def builtin_beats_alias():
+        result = run(["version"])
+        assert result.stdout.startswith("maw ") and not marker.exists(), result
+
+    def path_beats_alias():
+        shadowed = binaries / "maw-shadowed"
+        shadowed.write_text("#!/bin/sh\nprintf 'PATH wins\\n'\n")
+        shadowed.chmod(0o755)
+        try:
+            result = run(["shadowed"])
+            assert result.stdout == "PATH wins\n" and not marker.exists(), result
+        finally:
+            shadowed.unlink()
+
+    def reserved_beats_alias():
+        assert "unknown command" in run(["zig"], 2).stderr and not marker.exists()
+
+    def command_beats_alias():
+        # early sorts first and declares "later"; the plugin whose command it is wins.
+        result = run(["later"], 7)
+        assert json.loads(result.stdout)["argv"] == [str(later / "entry.mjs")], result.stdout
+
+    def duplicate_alias():
+        for args in (["dup", "two words"], ["dup", "version"]):
+            result = run(args, 2)
+            quoted = "'two words'" if args[1] == "two words" else "version"
+            assert result.stdout == "" and result.stderr == (
+                'maw: "dup" is an alias of 2 plugins (dup-one, dup-two); neither runs. Run one by name:\n'
+                f"  maw dup-one {quoted}\n  maw dup-two {quoted}\n"), result
+            assert not marker.exists(), ("an ambiguous alias ran plugin code", args)
+
+    def disabled_by_alias():
+        alias_config.write_text(json.dumps(dict(disabledPlugins=["atlas", "dup-two"])))
+        for args in (["at"], ["help", "at"], ["at", "version"]):
+            assert "maw: plugin atlas is disabled\n" == run(args, 1).stderr, args
+        # A disabled holder makes no ambiguity: the one enabled holder answers.
+        assert json.loads(run(["dup"], 7).stdout)["argv"] == [str(dup_one / "entry.mjs")]
+
+    for label, check in (("alias dispatch", alias_dispatch), ("alias version", alias_version),
+                         ("built-in beats alias", builtin_beats_alias), ("PATH beats alias", path_beats_alias),
+                         ("reserved name beats alias", reserved_beats_alias),
+                         ("command beats alias", command_beats_alias), ("duplicate alias", duplicate_alias),
+                         ("disabled by alias", disabled_by_alias)):
+        alias_case(label, check)
+    for folder in ("atlas", "later", "early", "dup-one", "dup-two"):
+        shutil.rmtree(plugins / folder)
+    assert not alias_failures, "alias cases failed:\n" + "\n".join(alias_failures)
+
     disabled = config / "maw.config.10.json"
     disabled.write_text(json.dumps(dict(disabledPlugins=["probe", "other-name"])))
     for args in (["probe"], ["help", "probe"], ["alias"], ["probe", "version"], ["alias", "--version"]):
@@ -252,4 +336,4 @@ process.exitCode=9;
         assert run(["versioned", "version", "extra"], 3).stdout == sentinel + "\n"
         answers(["versioned", "version"], "versioned 2.5.0-rc.1 (not a Git checkout)")
 
-print("dispatch smoke: installed Bun scripts, alias/help, reserved version verb, args/streams/cwd/exit, gating and precedence OK")
+print("dispatch smoke: installed Bun scripts, alias/help, plugin aliases (#55), reserved version verb, args/streams/cwd/exit, gating and precedence OK")

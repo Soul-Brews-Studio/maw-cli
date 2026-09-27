@@ -24,6 +24,8 @@ struct Plugin {
     target: String,
     interactive: bool,
     entry: Option<PathBuf>,
+    // cli.aliases: dispatch names tried after every command (#55).
+    aliases: Vec<String>,
 }
 const TIERS: [&str; 3] = ["core", "standard", "extra"];
 
@@ -289,6 +291,18 @@ fn manifest(
             .and_then(Value::as_bool)
             .unwrap_or(false),
         entry,
+        aliases: cli_metadata
+            .and_then(|cli| cli.get("aliases"))
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .filter(|alias| !alias.is_empty())
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default(),
     })
 }
 fn scan(root: &Path, disabled: &BTreeSet<String>) -> Result<Vec<Plugin>> {
@@ -480,6 +494,47 @@ fn short_commit(dir: &Path) -> Option<String> {
     }
 }
 
+// The plugin a verb names (#55): one whose command (cli.command, else its
+// manifest name) it is, first in inventory order, and only then one declaring it
+// in cli.aliases, so an alias never shadows a command. Built-ins and PATH
+// executables were already tried by the caller. An alias that more than one
+// enabled plugin declares resolves to none of them: Err holds every holder. A
+// disabled holder answers only when no enabled one does.
+fn resolve(inventory: Vec<Plugin>, name: &str) -> std::result::Result<Option<Plugin>, Vec<Plugin>> {
+    let mut enabled = Vec::new();
+    let mut disabled = Vec::new();
+    for p in inventory {
+        if p.command == name {
+            return Ok(Some(p));
+        }
+        if p.aliases.iter().any(|alias| alias == name) {
+            if p.enabled {
+                enabled.push(p);
+            } else {
+                disabled.push(p);
+            }
+        }
+    }
+    if enabled.len() > 1 {
+        return Err(enabled);
+    }
+    Ok(enabled.pop().or_else(|| disabled.into_iter().next()))
+}
+
+// Quote one word for a copy-pasteable sh command line.
+fn shell_quote(word: &OsString) -> String {
+    let word = word.to_string_lossy();
+    if !word.is_empty()
+        && word
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"_@%+=:,./-".contains(&c))
+    {
+        word.into_owned()
+    } else {
+        format!("'{}'", word.replace('\'', "'\\''"))
+    }
+}
+
 // Called only after builtin and PATH command lookup has failed.
 pub fn execute(name: &str, args: &[OsString]) -> Option<i32> {
     if !name
@@ -503,7 +558,27 @@ pub fn execute(name: &str, args: &[OsString]) -> Option<i32> {
             return Some(1);
         }
     };
-    let plugin = inventory.into_iter().find(|p| p.command == name)?;
+    let plugin = match resolve(inventory, name) {
+        Ok(plugin) => plugin?,
+        Err(holders) => {
+            let names: Vec<&str> = holders.iter().map(|p| p.name.as_str()).collect();
+            eprintln!(
+                "maw: {:?} is an alias of {} plugins ({}); neither runs. Run one by name:",
+                name,
+                holders.len(),
+                names.join(", ")
+            );
+            for holder in &holders {
+                let mut line = format!("  maw {}", holder.command);
+                for arg in args {
+                    line.push(' ');
+                    line.push_str(&shell_quote(arg));
+                }
+                eprintln!("{}", line);
+            }
+            return Some(2);
+        }
+    };
     let fail = |code, reason| {
         eprintln!("maw: plugin {} {}", plugin.name, reason);
         Some(code)
