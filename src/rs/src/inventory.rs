@@ -26,6 +26,9 @@ struct Plugin {
     entry: Option<PathBuf>,
     // cli.aliases: dispatch names tried after every command (#55).
     aliases: Vec<String>,
+    // description and cli.help, as root help lists them (#53).
+    description: String,
+    help: String,
 }
 const TIERS: [&str; 3] = ["core", "standard", "extra"];
 
@@ -303,6 +306,11 @@ fn manifest(
                     .collect()
             })
             .unwrap_or_default(),
+        description: text(m, "description").to_owned(),
+        help: cli_metadata
+            .map(|cli| text(cli, "help"))
+            .unwrap_or("")
+            .to_owned(),
     })
 }
 fn scan(root: &Path, disabled: &BTreeSet<String>) -> Result<Vec<Plugin>> {
@@ -533,6 +541,103 @@ fn shell_quote(word: &OsString) -> String {
     } else {
         format!("'{}'", word.replace('\'', "'\\''"))
     }
+}
+
+/// One installed plugin as root help lists it (#53).
+pub struct HelpPlugin {
+    pub command: String,
+    pub summary: String,
+    pub aliases: Vec<String>,
+}
+
+// Whether dispatch would ever look an installed plugin up by this word.
+fn typeable(word: &str) -> bool {
+    word.as_bytes()
+        .first()
+        .map_or(false, u8::is_ascii_lowercase)
+        && word
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        && !matches!(word, "go" | "rs" | "js" | "zig" | "index")
+}
+
+// The first non-empty line of text with control characters (terminal escapes
+// included) blanked.
+fn one_line(text: &str) -> String {
+    let line = text
+        .trim()
+        .split(|c: char| c == '\r' || c == '\n')
+        .next()
+        .unwrap_or("");
+    let blanked: String = line
+        .chars()
+        .map(|c| {
+            if (c as u32) < 32 || (127..=159).contains(&(c as u32)) {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect();
+    blanked.trim().to_owned()
+}
+
+/// Installed plugins resolved the way dispatch resolves them, reading manifests
+/// only. The inventory already holds one plugin per manifest name, and dispatch
+/// takes the first plugin in tier/name order declaring a command, so a later
+/// plugin declaring the same command is never returned. Enabled plugins come
+/// back sorted by command, with the number of disabled ones. Aliases keep only
+/// words that reach the plugin (#55): typeable, not a plugin command, and
+/// declared by no other enabled plugin, since such an alias runs neither.
+pub fn help_plugins() -> Result<(Vec<HelpPlugin>, usize)> {
+    let (root, config) = paths()?;
+    let inventory = scan(&root, &disabled_plugins(&config)?)?;
+    let mut claimed = BTreeSet::new();
+    let mut holders: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut enabled = Vec::new();
+    let mut disabled = 0;
+    for p in inventory {
+        if p.enabled {
+            let declared: BTreeSet<&String> = p.aliases.iter().collect();
+            for alias in declared {
+                *holders.entry(alias.clone()).or_insert(0) += 1;
+            }
+        }
+        if !typeable(&p.command) || !claimed.insert(p.command.clone()) {
+            continue;
+        }
+        if p.enabled {
+            enabled.push(p);
+        } else {
+            disabled += 1;
+        }
+    }
+    let mut result: Vec<HelpPlugin> = enabled
+        .iter()
+        .map(|p| {
+            let mut summary = one_line(&p.description);
+            if summary.is_empty() {
+                summary = one_line(&p.help);
+            }
+            let mut aliases: Vec<String> = Vec::new();
+            for alias in &p.aliases {
+                if typeable(alias)
+                    && !claimed.contains(alias)
+                    && holders.get(alias) == Some(&1)
+                    && !aliases.contains(alias)
+                {
+                    aliases.push(alias.clone());
+                }
+            }
+            HelpPlugin {
+                command: p.command.clone(),
+                summary,
+                aliases,
+            }
+        })
+        .collect();
+    result.sort_by(|a, b| a.command.cmp(&b.command));
+    Ok((result, disabled))
 }
 
 // Called only after builtin and PATH command lookup has failed.

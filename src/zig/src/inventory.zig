@@ -2,7 +2,8 @@ const std = @import("std");
 const V = std.json.Value;
 const Object = std.json.ObjectMap;
 const tiers = [_][]const u8{ "core", "standard", "extra" };
-const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool, command: []const u8, runtime: []const u8, target: []const u8, interactive: bool, entry: []const u8, aliases: []const []const u8 = &.{} };
+// description and help hold description and cli.help, as root help lists them (#53).
+const Plugin = struct { name: []const u8, version: []const u8, tier: usize, dir: []const u8, enabled: bool, cli: bool, api: bool, missing: bool, command: []const u8, runtime: []const u8, target: []const u8, interactive: bool, entry: []const u8, aliases: []const []const u8 = &.{}, description: []const u8 = "", help: []const u8 = "" };
 const Config = struct { path: []const u8, name: []const u8, weight: []const u8, local: bool };
 const Context = struct {
     a: std.mem.Allocator,
@@ -140,11 +141,13 @@ const Context = struct {
         var command: []const u8 = "";
         var interactive = false;
         var aliases: std.ArrayList([]const u8) = .empty;
+        var help: []const u8 = "";
         if (m.get("cli")) |value| {
             if (value == .object) {
                 command = string(value.object, "command");
                 if (command.len == 0) command = name;
                 if (value.object.get("interactive")) |flag| interactive = flag == .bool and flag.bool;
+                help = string(value.object, "help");
                 // cli.aliases: dispatch names tried after every command (#55).
                 if (value.object.get("aliases")) |list| {
                     if (list == .array) for (list.array.items) |item| {
@@ -154,7 +157,7 @@ const Context = struct {
             }
         }
         const absolute_entry = if (entry.len == 0) "" else try c.join(&.{ dir, entry });
-        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(absolute_entry), .command = command, .runtime = string(m, "runtime"), .target = string(m, "target"), .interactive = interactive, .entry = absolute_entry, .aliases = try aliases.toOwnedSlice(c.a) };
+        return .{ .name = name, .version = version, .dir = dir, .tier = tier orelse (if (w < 10) @as(usize, 0) else if (w < 50) @as(usize, 1) else @as(usize, 2)), .enabled = !off.contains(name), .cli = cli, .api = isObject(m.get("api")), .missing = if (entry.len == 0) cli else !c.regular(absolute_entry), .command = command, .runtime = string(m, "runtime"), .target = string(m, "target"), .interactive = interactive, .entry = absolute_entry, .aliases = try aliases.toOwnedSlice(c.a), .description = string(m, "description"), .help = help };
     }
     fn scan(c: Context, root: []const u8, off: std.StringHashMap(void)) ![]Plugin {
         const overrides = (try c.read(try c.join(&.{ root, ".overrides.json" }))) orelse Object.empty;
@@ -276,6 +279,84 @@ fn execute(c: Context, verbose: bool, all: bool) !u8 {
     const plugins = try c.scan(locations.plugins, off);
     try c.render(plugins, verbose, all);
     return 0;
+}
+
+/// One installed plugin as root help lists it (#53).
+pub const HelpPlugin = struct { command: []const u8, summary: []const u8, aliases: []const []const u8 };
+pub const HelpInventory = struct { plugins: []const HelpPlugin, disabled: usize };
+
+// Whether dispatch would ever look an installed plugin up by this word.
+fn typeable(word: []const u8) bool {
+    if (word.len == 0 or word[0] < 'a' or word[0] > 'z') return false;
+    for (word) |b| if (!((b >= 'a' and b <= 'z') or std.ascii.isDigit(b) or b == '-')) return false;
+    for ([_][]const u8{ "go", "rs", "js", "zig", "index" }) |reserved| if (eql(word, reserved)) return false;
+    return true;
+}
+
+// The first non-empty line of text with control characters (terminal escapes
+// included) blanked.
+fn oneLine(a: std.mem.Allocator, text: []const u8) ![]const u8 {
+    const trimmed = std.mem.trim(u8, text, " \t\r\n\x0b\x0c");
+    const line = trimmed[0 .. std.mem.indexOfAny(u8, trimmed, "\r\n") orelse trimmed.len];
+    var out: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    while (i < line.len) : (i += 1) {
+        if (line[i] < 32 or line[i] == 127) {
+            try out.append(a, ' ');
+        } else if (line[i] == 0xc2 and i + 1 < line.len and line[i + 1] >= 0x80 and line[i + 1] <= 0x9f) {
+            try out.append(a, ' ');
+            i += 1;
+        } else try out.append(a, line[i]);
+    }
+    return std.mem.trim(u8, out.items, " ");
+}
+
+fn lessHelp(_: void, a: HelpPlugin, b: HelpPlugin) bool {
+    return lessString({}, a.command, b.command);
+}
+
+/// Installed plugins resolved the way dispatch resolves them, reading manifests
+/// only. The inventory already holds one plugin per manifest name, and dispatch
+/// takes the first plugin in tier/name order declaring a command, so a later
+/// plugin declaring the same command is never returned. Enabled plugins come
+/// back sorted by command, with the number of disabled ones. Aliases keep only
+/// words that reach the plugin (#55): typeable, not a plugin command, and
+/// declared by no other enabled plugin, since such an alias runs neither.
+pub fn helpPlugins(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ.Map) !HelpInventory {
+    const c = Context{ .a = a, .io = io, .env = env };
+    const locations = try c.paths();
+    const inventory = try c.scan(locations.plugins, try c.disabled(locations.config));
+    var claimed = std.StringHashMap(void).init(a);
+    var holders = std.StringHashMap(usize).init(a);
+    var enabled: std.ArrayList(Plugin) = .empty;
+    var disabled: usize = 0;
+    for (inventory) |p| {
+        if (p.enabled) for (p.aliases, 0..) |alias, index| {
+            var repeated = false;
+            for (p.aliases[0..index]) |earlier| repeated = repeated or eql(earlier, alias);
+            if (repeated) continue;
+            const count = try holders.getOrPut(alias);
+            count.value_ptr.* = if (count.found_existing) count.value_ptr.* + 1 else 1;
+        };
+        if (!typeable(p.command) or claimed.contains(p.command)) continue;
+        try claimed.put(p.command, {});
+        if (p.enabled) try enabled.append(a, p) else disabled += 1;
+    }
+    var result: std.ArrayList(HelpPlugin) = .empty;
+    for (enabled.items) |p| {
+        var summary = try oneLine(a, p.description);
+        if (summary.len == 0) summary = try oneLine(a, p.help);
+        var aliases: std.ArrayList([]const u8) = .empty;
+        for (p.aliases) |alias| {
+            if (!typeable(alias) or claimed.contains(alias) or (holders.get(alias) orelse 0) != 1) continue;
+            var repeated = false;
+            for (aliases.items) |kept| repeated = repeated or eql(kept, alias);
+            if (!repeated) try aliases.append(a, alias);
+        }
+        try result.append(a, .{ .command = p.command, .summary = summary, .aliases = aliases.items });
+    }
+    std.mem.sort(HelpPlugin, result.items, {}, lessHelp);
+    return .{ .plugins = result.items, .disabled = disabled };
 }
 
 pub const Dispatch = union(enum) { failure: u8, argv: []const []const u8, answered };

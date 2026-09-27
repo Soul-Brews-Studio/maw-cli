@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Actual-process installed-plugin inventory fixture; no real user plugins loaded."""
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import pty
+import struct
 import subprocess
 import sys
 import tempfile
+import termios
 
 command = sys.argv[1:]
 if command[:1] == ["--"]:
@@ -16,6 +20,139 @@ if not command:
 command[0] = str(Path(command[0]).resolve())
 if len(command) > 1:
     command[1] = str(Path(command[1]).resolve())
+
+
+def section(text, header):
+    """Rows under HEADER up to the next blank line, or None when HEADER is absent."""
+    lines = text.split("\n")
+    if header not in lines:
+        return None
+    rows = []
+    for line in lines[lines.index(header) + 1:]:
+        if not line:
+            break
+        rows.append(line)
+    return rows
+
+
+# Root help (#53): built-ins, installed plugins and PATH executables each get a
+# section. Installed rows resolve the way dispatch does, from manifests only.
+# Runs for every port, before the maw-rs listing probe below can skip.
+with tempfile.TemporaryDirectory(prefix="maw-help-") as temporary:
+    root = Path(temporary)
+    home, plugins, config, binaries = (root / name for name in ("home", "plugins", "config", "bin"))
+    for directory in (home, plugins, config, binaries):
+        directory.mkdir()
+    marker = root / "marker"
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("MAW_", "XDG_"))}
+    env.update(HOME=str(home), USERPROFILE=str(home), MAW_PLUGINS_DIR=str(plugins),
+               MAW_CONFIG_DIR=str(config), PATH=str(binaries))
+    # maw-version loses to the built-in, so it must appear in neither section.
+    for name in ("fleet", "shadowed", "version"):
+        executable = binaries / f"maw-{name}"
+        executable.write_text(f"#!/bin/sh\necho ran > '{marker}'\n")
+        executable.chmod(0o755)
+
+    def installed(folder, name, cli=None, entry="index.js", **metadata):
+        directory = plugins / folder
+        directory.mkdir()
+        value = dict(name=name, version="1.0.0", **metadata)
+        if cli is not None:
+            value["cli"] = cli
+        if entry:
+            value["entry"] = entry
+        (directory / "plugin.json").write_text(json.dumps(value))
+        (directory / "index.js").write_text("throw new Error('help must never run plugin code');\n")
+
+    long_description = "Long description " + "word " * 40
+    # Only "at" can reach atlas: an invalid word, a built-in and another plugin's
+    # command never dispatch as an alias (#55), so help does not show them.
+    installed("atlas", "atlas", description="Discord fleet infrastructure",
+              cli=dict(aliases=["at", "Bad Alias", "version", "fold", "at"], help="maw atlas <ls|read>"))
+    installed("zz-stray", "atlas", cli={}, description="STRAY folder re-declaring atlas")
+    # Two enabled plugins declaring one alias: dispatch runs neither (#55).
+    installed("x-folder", "fold", cli=dict(aliases=["dup"]), description="Folder name differs from its manifest name")
+    installed("helponly", "helponly", cli=dict(help="maw helponly — summary from cli.help", aliases=["dup"]))
+    installed("long", "long", cli={}, description=long_description)
+    installed("multi", "multi", cli={}, description="first line\nsecond line")
+    installed("off", "off", cli={}, description="DISABLED plugin")
+    installed("shadowed", "shadowed", cli={}, description="loses to PATH")
+    installed("version", "version", cli={}, description="loses to the built-in")
+    installed("apionly", "apionly", entry="", api={}, description="APIONLY has no command")
+    (config / "maw.config.json").write_text(json.dumps({"disabledPlugins": ["off"]}))
+
+    def files():
+        return {str(p.relative_to(root)): (hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_mtime_ns)
+                for p in root.rglob("*") if p.is_file()}
+
+    def help_run(args, expect=0):
+        result = subprocess.run(command + args, cwd=root, env=env, input="", text=True,
+                                capture_output=True, timeout=8)
+        assert result.returncode == expect, (args, result.returncode, result.stdout, result.stderr)
+        return result
+
+    before = files()
+    text = help_run([]).stdout
+    for args in (["help"], ["--help"], ["-h"]):
+        assert help_run(args).stdout == text, args
+    lines = text.split("\n")
+    commands, rows, external = (section(text, header) for header in
+                                ("Commands:", "Installed plugins:", "External (PATH):"))
+    assert commands and rows is not None and external is not None, text
+    assert lines.index("Commands:") < lines.index("Installed plugins:") < lines.index("External (PATH):"), text
+    # Built-ins stay under Commands; PATH executables no longer sit among them.
+    assert {"help", "version"} <= {row.split()[0] for row in commands}, commands
+    assert not any(row.split()[0] in ("fleet", "shadowed") for row in commands), commands
+    assert "External plugin" not in text, text
+    assert [row.split() for row in external] == [["fleet", "maw-fleet"], ["shadowed", "maw-shadowed"]], external
+    # Enabled plugins by manifest name, sorted; disabled counted, not listed.
+    assert rows[-1] == "  1 disabled — maw plugin ls --all", rows
+    listed = rows[:-1]
+    assert [row.split()[0] for row in listed] == ["atlas", "fold", "helponly", "long", "multi", "shadowed", "version"], rows
+    assert all(len(row) <= 80 for row in rows), rows
+    by_name = {row.split()[0]: row for row in listed}
+    assert by_name["atlas"].startswith("  atlas (at) ") and by_name["atlas"].endswith("Discord fleet infrastructure"), rows
+    assert by_name["fold"].startswith("  fold ") and by_name["helponly"].startswith("  helponly "), rows
+    assert by_name["fold"].endswith("Folder name differs from its manifest name"), rows
+    assert by_name["helponly"].endswith("maw helponly — summary from cli.help"), rows
+    assert by_name["long"].endswith("…") and len(by_name["long"]) == 80, rows
+    assert by_name["multi"].endswith("first line"), rows
+    assert "(shadowed by PATH maw-shadowed)" in by_name["shadowed"], rows
+    assert "(shadowed by built-in)" in by_name["version"], rows
+    for absent in ("STRAY", "x-folder", "Bad Alias", "dup", "second line", "DISABLED", "APIONLY", "apionly"):
+        assert absent not in text, (absent, text)
+    assert not marker.exists(), "root help executed a PATH executable"
+    assert files() == before, "root help modified plugin/config files"
+
+    # On a terminal, rows are cut to its width instead of 80.
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 60, 0, 0))
+    process = subprocess.Popen(command, cwd=root, env=env, stdin=subprocess.DEVNULL,
+                               stdout=slave, stderr=subprocess.PIPE)
+    os.close(slave)
+    chunks = []
+    while True:
+        try:
+            chunk = os.read(master, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        chunks.append(chunk)
+    os.close(master)
+    assert process.wait(timeout=8) == 0
+    process.stderr.close()
+    tty_rows = section(b"".join(chunks).decode().replace("\r\n", "\n"), "Installed plugins:")
+    assert tty_rows and all(len(row) <= 60 for row in tty_rows), tty_rows
+    assert any(row.endswith("…") and len(row) == 60 for row in tty_rows), tty_rows
+
+    # An unreadable inventory drops the section, never the help or its exit code.
+    (plugins / ".overrides.json").write_text("[]")
+    broken = help_run([])
+    assert "Commands:" in broken.stdout and "External (PATH):" in broken.stdout, broken.stdout
+    assert "Installed plugins:" not in broken.stdout, broken.stdout
+    assert "maw plugin ls" in broken.stderr, broken.stderr
+print("plugin smoke: root help sections, dispatch-resolved installed plugins, aliases, shadowing, disabled count, width OK")
 
 with tempfile.TemporaryDirectory(prefix="maw-inventory-") as temporary:
     root = Path(temporary)
