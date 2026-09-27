@@ -55,14 +55,26 @@ def prepare(ci_run):
     evidence = api(f"repos/{REPO}/actions/runs/{ci_run}")
     if (str(evidence["id"]) != str(ci_run)
             or evidence["path"] != ".github/workflows/ci.yml"
-            or evidence["event"] != "push" or evidence["head_branch"] != "alpha"
+            or evidence["event"] not in ("push", "schedule", "workflow_dispatch")
+            or evidence["head_branch"] != "alpha"
             or evidence["head_repository"]["full_name"] != REPO
             or evidence["repository"]["full_name"] != REPO
             or evidence["status"] != "completed" or evidence["conclusion"] != "success"):
-        raise RuntimeError("not a successful canonical alpha push CI run")
+        raise RuntimeError("not a successful canonical alpha CI run")
     commit = evidence["head_sha"]
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise RuntimeError("invalid CI commit")
+    # A scheduled run whose gate skipped the matrix still concludes success (#49).
+    # Only a run where every smoke job actually passed is verification.
+    jobs = api(f"repos/{REPO}/actions/runs/{ci_run}/jobs?per_page=100")["jobs"]
+    smoke = [job for job in jobs if job["name"].startswith("smoke")]
+    if len(smoke) != 8 or any(job["status"] != "completed" or job["conclusion"] != "success" for job in smoke):
+        return dict(skip=True, reason="CI run did not execute all eight smoke jobs", ci_run=int(ci_run))
+    # The tag comes from the run's time, so a daily heartbeat on unchanged code
+    # would otherwise publish the same commit again under a new tag.
+    released = [r["tag_name"] for r in releases() if r["target_commitish"] == commit and not r["draft"]]
+    if released:
+        return dict(skip=True, reason=f"commit already released as {released[0]}", ci_run=int(ci_run))
     if api(f"repos/{REPO}/branches/alpha")["commit"]["sha"] != commit:
         return dict(skip=True, reason="CI commit superseded on alpha", ci_run=int(ci_run))
     base = calculator(evidence["created_at"])
