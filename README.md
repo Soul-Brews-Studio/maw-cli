@@ -254,8 +254,9 @@ This is a **read-only JSON inventory**, not the old maw runtime loader. It reads
 path/config overrides are supported; project overlays, active profiles and
 runtime compatibility/hash validation are not. `health: ok` checks file existence,
 not whether plugins are safe or runnable. See the [inventory contract](docs/installed-plugin-listing.md).
-Built-ins and PATH commands remain visible in `help`. Listing never installs or
-changes plugin state.
+Root `help` lists built-ins, then enabled installed plugins with their aliases and
+one-line descriptions, then `maw-<command>` PATH executables, each in its own
+section. Listing never installs or changes plugin state.
 
 ### Install, update, and check
 

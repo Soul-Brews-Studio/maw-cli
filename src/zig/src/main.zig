@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const registry = @import("registry.zig");
 const lifecycle = @import("lifecycle.zig");
@@ -26,14 +27,74 @@ const Host = struct {
         return 2;
     }
 
-    fn help(self: Host, args: []const []const u8) !u8 {
-        if (args.len == 0) {
-            try self.output(.stdout(), "Usage: maw <command> [args]\n\nCommands:\n", .{});
-            for (self.commands) |command| {
-                if (eql(command.name, "plugins")) continue;
+    // Aligns labels in one column and cuts each row to `columns` characters,
+    // ending a cut summary with an ellipsis.
+    fn rows(self: Host, entries: []const [2][]const u8, columns: usize) !void {
+        var width: usize = 12;
+        for (entries) |entry| width = @max(width, entry[0].len);
+        for (entries) |entry| {
+            const head = try std.fmt.allocPrint(self.allocator, "  {s}", .{entry[0]});
+            const padding = try self.allocator.alloc(u8, width - entry[0].len);
+            @memset(padding, ' ');
+            const characters = std.unicode.utf8CountCodepoints(entry[1]) catch entry[1].len;
+            const room = columns -| (head.len + padding.len + 1);
+            if (characters > 0 and characters <= room) {
+                try self.output(.stdout(), "{s}{s} {s}\n", .{ head, padding, entry[1] });
+            } else if (characters > 0 and room > 0) {
+                var end: usize = 0;
+                var kept: usize = 0;
+                while (kept < room - 1) : (kept += 1) end += std.unicode.utf8ByteSequenceLength(entry[1][end]) catch 1;
+                try self.output(.stdout(), "{s}{s} {s}\u{2026}\n", .{ head, padding, entry[1][0..end] });
+            } else try self.output(.stdout(), "{s}\n", .{head});
+        }
+    }
+
+    // Built-ins, installed plugins and PATH executables as separate sections
+    // (#53). Installed plugins come from manifests only; nothing runs.
+    fn rootHelp(self: Host) !void {
+        const columns = terminalWidth();
+        try self.output(.stdout(), "Usage: maw <command> [args]\n\nCommands:\n", .{});
+        var external: std.ArrayList([2][]const u8) = .empty;
+        for (self.commands) |command| {
+            if (command.kind == .external) {
+                try external.append(self.allocator, .{ command.name, try std.fmt.allocPrint(self.allocator, "maw-{s}", .{command.name}) });
+            } else if (!eql(command.name, "plugins")) {
                 try self.output(.stdout(), "  {s: <12} {s}\n", .{ command.name, command.summary });
             }
-            try self.output(.stdout(), "\nRun 'maw help <command>' for command help.\nPlugins: executable maw-<command> files in absolute PATH directories.\n", .{});
+        }
+        if (inventory.helpPlugins(self.allocator, self.io, self.env)) |listed| {
+            if (listed.plugins.len > 0 or listed.disabled > 0) {
+                var entries: std.ArrayList([2][]const u8) = .empty;
+                for (listed.plugins) |p| {
+                    var aliases: std.ArrayList([]const u8) = .empty;
+                    for (p.aliases) |alias| {
+                        if (registry.find(self.commands, alias) == null) try aliases.append(self.allocator, alias);
+                    }
+                    const label = if (aliases.items.len == 0) p.command else try std.fmt.allocPrint(self.allocator, "{s} ({s})", .{ p.command, try std.mem.join(self.allocator, ", ", aliases.items) });
+                    var summary = p.summary;
+                    if (registry.find(self.commands, p.command)) |shadow| {
+                        const mark = if (shadow.kind == .external) try std.fmt.allocPrint(self.allocator, "(shadowed by PATH maw-{s})", .{p.command}) else "(shadowed by built-in)";
+                        summary = if (summary.len == 0) mark else try std.fmt.allocPrint(self.allocator, "{s} {s}", .{ mark, summary });
+                    }
+                    try entries.append(self.allocator, .{ label, summary });
+                }
+                try self.output(.stdout(), "\nInstalled plugins:\n", .{});
+                try self.rows(entries.items, columns);
+                if (listed.disabled > 0) try self.output(.stdout(), "  {d} disabled \u{2014} maw plugin ls --all\n", .{listed.disabled});
+            }
+        } else |err| {
+            try self.output(.stderr(), "maw: installed plugins not listed: {s}\n  maw plugin ls\n", .{@errorName(err)});
+        }
+        if (external.items.len > 0) {
+            try self.output(.stdout(), "\nExternal (PATH):\n", .{});
+            try self.rows(external.items, columns);
+        }
+        try self.output(.stdout(), "\nRun 'maw help <command>' for command help.\nPlugins: executable maw-<command> files in absolute PATH directories.\n", .{});
+    }
+
+    fn help(self: Host, args: []const []const u8) !u8 {
+        if (args.len == 0) {
+            try self.rootHelp();
             return 0;
         }
         if (args.len != 1) return self.fail("usage: maw help [command]");
@@ -96,6 +157,19 @@ const Host = struct {
         return 0;
     }
 };
+
+// Columns of the terminal on stdout; 80 when stdout is not a terminal. ioctl is
+// called directly: through std.Io's device_io_control, the ReleaseFast build
+// never saw the kernel's write and always answered 80.
+fn terminalWidth() usize {
+    var size: std.posix.winsize = .{ .row = 0, .col = 0, .xpixel = 0, .ypixel = 0 };
+    const ok = switch (builtin.os.tag) {
+        .linux => std.os.linux.errno(std.os.linux.ioctl(1, std.os.linux.T.IOCGWINSZ, @intFromPtr(&size))) == .SUCCESS,
+        .macos => std.c.ioctl(1, @bitCast(@as(u32, std.c.T.IOCGWINSZ)), &size) == 0,
+        else => false,
+    };
+    return if (ok and size.col > 0) size.col else 80;
+}
 
 fn eql(a: []const u8, b: []const u8) bool {
     return std.mem.eql(u8, a, b);

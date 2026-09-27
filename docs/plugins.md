@@ -4,7 +4,7 @@
 
 | Command | Purpose |
 |---|---|
-| `maw`, `maw -h`, `maw --help`, `maw help` | List registered commands |
+| `maw`, `maw -h`, `maw --help`, `maw help` | List built-ins, installed plugins and PATH commands, in that order |
 | `maw help <command>` | Show built-in usage or invoke an external plugin with `--help` |
 | `maw version`, `maw -v`, `maw --version` | Print the host version |
 | `maw plugin ls` | Summarize installed global plugin JSON metadata |
@@ -45,7 +45,18 @@ Find executable `bun` in absolute PATH directories (relative/empty entries are
 ignored), then spawn it with `[entry, ...args]` and inherited streams, environment
 and working directory. No import, shell interpolation, fetch or install step.
 The Bun host also uses external `bun`, not its own compiled executable as a runtime.
-Root help remains the built-in/PATH catalog; use `plugin ls` for installed names.
+Root help lists built-ins under `Commands:`, installed plugins under
+`Installed plugins:` and `maw-<command>` PATH executables under `External (PATH):`
+(#53). An installed row is what dispatch reaches: the command above (never a
+folder name, and only the first plugin declaring it), in parentheses the
+`cli.aliases` that dispatch would route to it (not a built-in, PATH executable,
+plugin command, or an alias another enabled plugin also declares; see
+[plugin aliases](plugin-lifecycle.md#plugin-aliases-clialiases)), and the
+manifest `description` (else `cli.help`) cut to one line at
+the terminal width, 80 when stdout is not a terminal. Only enabled plugins get a
+row; `N disabled — maw plugin ls --all` counts the rest, and a row whose command
+a built-in or PATH executable takes is marked `(shadowed by …)`. An unreadable
+inventory drops the section with a note on stderr; help still exits **0**.
 Root help/list never execute entries. Explicit `help herdr` invokes the selected
 plugin with `--help`, just like `herdr --help`.
 

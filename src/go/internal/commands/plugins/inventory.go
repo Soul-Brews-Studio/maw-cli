@@ -18,6 +18,8 @@ type installed struct {
 	Interactive                     bool
 	Enabled, CLI, API, Missing      bool
 	Aliases                         []string // cli.aliases: dispatch names after commands (#55)
+	// description and cli.help, as root help lists them (#53).
+	Description, Help string
 }
 
 func safePath(path string) string {
@@ -188,6 +190,7 @@ func scanInstalled(root string, disabled map[string]bool, stderr io.Writer) ([]i
 				p.Command = name
 			}
 			p.Interactive, _ = cli["interactive"].(bool)
+			p.Help = stringField(cli, "help")
 			aliases, _ := cli["aliases"].([]any)
 			for _, value := range aliases {
 				if alias, _ := value.(string); alias != "" {
@@ -195,6 +198,7 @@ func scanInstalled(root string, disabled map[string]bool, stderr io.Writer) ([]i
 				}
 			}
 		}
+		p.Description = stringField(m, "description")
 		p.Runtime, p.Target = stringField(m, "runtime"), stringField(m, "target")
 		p.Missing = p.CLI && executable == ""
 		if executable != "" {
