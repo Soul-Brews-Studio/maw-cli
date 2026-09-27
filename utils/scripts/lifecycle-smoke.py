@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Actual-process lifecycle fixture: local Git only, no user plugins or network."""
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -152,4 +153,23 @@ with tempfile.TemporaryDirectory(prefix="maw-lifecycle-") as temporary:
     run("plugin", "install", str(source), "--ref", transformed)
     assert (plugins / "crlf/index.js").read_bytes().endswith(b"\r\n")
     run("plugin", "check", "crlf", status=1)
-    print("lifecycle: catalog, Git install/update/pins, entry blob check, dirty/symlink/name protection OK")
+    # #43: a single leading "./" names the same in-tree file. It installs, and
+    # info/check report the normalized entry. Every other dot or empty segment,
+    # absolute path and "././" stays refused, leaving no plugin directory behind.
+    (source / ".gitattributes").unlink()
+    manifest.update(name="dotslash", entry="./index.js")
+    (source / "plugin.json").write_text(json.dumps(manifest))
+    dotslash = commit("entry with a single leading ./")
+    run("plugin", "install", str(source), "--ref", dotslash)
+    info = run("plugin", "info", "dotslash")
+    # Ports differ in the separator (tab in go/rs/js, space in zig); the value must be exact.
+    assert re.search(r"^entry\s+index\.js$", info, re.M), info
+    run("plugin", "check", "dotslash")
+    for index, unsafe in enumerate(["../index.js", "/index.js", "a/../index.js", "a/./index.js",
+                                    "a//index.js", ".", "./", "./../index.js", "././index.js"]):
+        manifest.update(name=f"unsafe{index}", entry=unsafe)
+        (source / "plugin.json").write_text(json.dumps(manifest))
+        refused = commit(f"unsafe entry {unsafe!r}")
+        run("plugin", "install", str(source), "--ref", refused, status=1)
+        assert not (plugins / f"unsafe{index}").exists(), unsafe
+    print("lifecycle: catalog, Git install/update/pins, entry blob check, dirty/symlink/name protection, leading ./ entry OK")

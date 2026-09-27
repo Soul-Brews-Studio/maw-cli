@@ -67,6 +67,9 @@ func manifestEntry(m map[string]any) (string, string, error) {
 	if entry == "" {
 		entry = stringField(m, "wasm")
 	}
+	// A single leading "./" names the same in-tree file; most plugins write it (#43).
+	// TrimPrefix removes one occurrence, so "././x" still fails the check below.
+	entry = strings.TrimPrefix(entry, "./")
 	if !lifecycleName(name) || version == "" || safePath(version) != version || !lifecycleEntry(entry) {
 		return "", "", fmt.Errorf("invalid plugin name, version or entry")
 	}

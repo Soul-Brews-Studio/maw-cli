@@ -41,7 +41,10 @@ Only Go supports this route; the other ports remain Git-only installers.
   files are materialized. Preserve executable bits, discard special permission
   bits. Compressed input is limited to 128 MiB, the uncompressed stream to
   512 MiB, returned tar headers to 4096, manifests to 1 MiB. Verify gzip CRC.
-- Require valid name/version/entry and an in-tree regular entry file. If declared,
+- Require valid name/version/entry and an in-tree regular entry file. A single
+  leading `./` in the entry is accepted and stripped (`./index.ts` is `index.ts`);
+  any other `.`, `..` or empty segment, an absolute path, a backslash or a
+  control character is refused (#43). If declared,
   validate `artifact`/`bundledArtifacts` paths and SHA-256 digests; these are
   package self-consistency checks, not independently trusted signatures. The
   archive must come from a trusted source. Never execute package code on install.

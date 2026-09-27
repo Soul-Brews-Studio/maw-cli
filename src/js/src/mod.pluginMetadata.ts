@@ -7,7 +7,11 @@ export function pluginMetadata(dir: string, revision = "HEAD"): { name: string; 
   if (Buffer.byteLength(raw) > 1048576) throw new Error("plugin.json is too large");
   const m = JSON.parse(raw);
   if (!m || typeof m !== "object" || Array.isArray(m) || typeof m.name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(m.name) || typeof m.version !== "string" || !m.version || /[\x00-\x1f\x7f-\x9f]/.test(m.version)) throw new Error("invalid plugin name or version");
-  const entry = m.entry || m.artifact?.path || m.wasm;
+  const declared = m.entry || m.artifact?.path || m.wasm;
+  // A single leading "./" names the same in-tree file; most plugins write it (#43).
+  // Strip it before the check, and use the stripped path for git, which reports
+  // paths without the prefix. Everything the check refuses stays refused.
+  const entry = typeof declared === "string" && declared.startsWith("./") ? declared.slice(2) : declared;
   if (typeof entry !== "string" || !entry || entry.includes("\\") || /[\x00-\x1f\x7f-\x9f]/.test(entry) || entry.split("/").some((part: string) => !part || part === "." || part === "..")) throw new Error("unsafe plugin entry");
   const tree = pluginGit(dir, ["ls-tree", "-z", revision, "--", entry]);
   const match = /^100(?:644|755) blob ([0-9a-f]+)\t([^\0]+)\0$/.exec(tree);

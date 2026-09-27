@@ -89,6 +89,8 @@ fn metadata(bytes: &[u8]) -> Result<(String, String)> {
     if entry.is_empty() {
         entry = field(&v, "wasm");
     }
+    // A single leading "./" names the same in-tree file; most plugins write it (#43).
+    let entry = entry.strip_prefix("./").unwrap_or(entry);
     if !entry_path(entry) {
         return Err("unsafe plugin entry".into());
     }
