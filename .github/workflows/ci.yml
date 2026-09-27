@@ -1,11 +1,10 @@
 name: CI
 
-# Scheduled, not per push or PR (#49): hourly while alpha changes, a daily
-# heartbeat otherwise. The gate job decides; workflow_dispatch always runs.
-# Pull requests are checked locally with `just <port> check` before merge.
+# Manual only. Tests run locally (`just <port> check`) before every merge; GitHub
+# Actions minutes are billed, and macOS runners cost ten times Linux, so this
+# workflow never runs on its own and never on macOS. Run by hand if needed:
+#   gh workflow run ci.yml --ref alpha --repo Soul-Brews-Studio/maw-cli
 on:
-  schedule:
-    - cron: '23 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -42,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         language: [go, rs, js, zig]
     runs-on: ${{ matrix.os }}
     steps:

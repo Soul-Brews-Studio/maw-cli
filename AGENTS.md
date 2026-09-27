@@ -1,5 +1,14 @@
 # Repository Agent Instructions
 
+## GitHub Actions is off — test locally (Nat, 2026-09-28)
+
+Actions minutes were billed heavily, macOS runners at ten times Linux. Tests run
+locally only: `just <port> check` for every port a change touches, before merge,
+with the real exit codes in the PR body. `ci.yml` is manual-only and Linux-only;
+`release.yml` is disabled, because its darwin builds run on macOS runners, and
+re-enabling it needs cross-compiled darwin builds first. Never trigger a workflow,
+never add a macOS runner, and do not treat a missing CI result as a failure.
+
 ## Shared instructions
 
 `AGENTS.md` is the source of truth for repository instructions. `CLAUDE.md`
