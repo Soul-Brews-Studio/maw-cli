@@ -139,7 +139,7 @@ executables on Linux/macOS, amd64/arm64. It downloads the matching prebuilt,
 verifies checksums, metadata and its exact version, then replaces only the
 current executable. No Go compiler, curl, tar or Git is needed for self-update.
 Plugins/configuration stay untouched. The prebuilt `maw-js` has the same command
-(`maw-js update [--check] [--version TAG]`); Rust and Zig do not have it yet.
+(`maw-js update [alpha] [--check] [--version TAG]`); Rust and Zig do not have it yet.
 Local `dev`/`go run` builds can only `--check`. A newer source install waits for
 a published release instead of silently downgrading. [Update contract](docs/self-update.md).
 
@@ -175,10 +175,11 @@ export PATH="$HOME/.local/bin:$PATH"
 maw-zig --help
 ```
 
-Rust, Zig and Bun source installs do **not** self-`update`. Install a newer published
-tag using the corresponding command instead; from a git checkout, `maw-js update`
-prints the `git -C <checkout> pull --ff-only` to run. Only the prebuilt `maw-js`
-replaces itself. `plugin update` updates a plugin,
+Rust and Zig do **not** self-`update`, nor does a Bun install from the Git package.
+Install a newer published tag using the corresponding command instead. A Bun run
+from a git checkout (`bun link`) is the exception: `maw-js update` fast-forwards
+that checkout, and `maw-js update alpha` switches it to alpha first; a dirty or
+diverged tree is refused ([contract](docs/self-update.md)). `plugin update` updates a plugin,
 not the host CLI. Bun/Rust source installs may report `dev`; a source tag pin is
 not necessarily an embedded release version. Prebuilt executables embed CalVer.
 

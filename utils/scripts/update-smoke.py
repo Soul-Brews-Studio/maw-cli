@@ -3,12 +3,15 @@
 
     update-smoke.py                  maw-go, built with a Go source overlay
     update-smoke.py -- BUN ENTRY     maw-js, compiled by BUN from an overlay copy
-                                     of src/js/src; ENTRY is the source-run CLI
-                                     under smoke (dev source-checkout case only)
+                                     of src/js/src, plus source-checkout updates
+                                     in a throwaway bare origin + clone; ENTRY is
+                                     the source-run CLI under smoke, given only
+                                     side-effect-free usage errors
 
 Requires openssl plus Go or Bun for fixture setup only. The overlay changes the
 release origins and trusts the fixture CA; shipped source has no test URL switch.
-The updater only ever replaces a copied executable inside the temporary tree.
+The updater only ever replaces a copied executable, or fast-forwards a clone,
+inside the temporary tree; the real ENTRY never reaches git or the network.
 """
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -143,10 +146,12 @@ with tempfile.TemporaryDirectory(prefix="maw-update-") as temporary:
             subprocess.run([go, "build", "-o", str(noisy_binary), str(noisy_source)], check=True)
             binaries["noisy"] = noisy_binary.read_bytes()
         else:
-            # The overlay is a copy of src/js/src inside a throwaway git checkout,
-            # so the same tree serves the compiled fixtures and the source run.
-            checkout = root / "checkout"
-            overlay = checkout / "src/js/src"
+            # The overlay is a copy of src/js/src committed in a throwaway seed
+            # repository, pushed to a bare origin and cloned: the clone is the
+            # dev checkout, the seed publishes new commits, and the compiled
+            # fixtures come from the same overlay.
+            seed, origin_repo, clone = root / "seed", root / "origin.git", root / "clone"
+            overlay = seed / "src/js/src"
             shutil.copytree(repo / "src/js/src", overlay)
             origins = overlay / "mod.validReleaseUrl.ts"
             source = origins.read_text()
@@ -170,15 +175,27 @@ with tempfile.TemporaryDirectory(prefix="maw-update-") as temporary:
             git_env = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "MAW_"))}
             git_env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null", GIT_TERMINAL_PROMPT="0")
 
-            def g(*args):
-                result = subprocess.run([git, "-c", "core.hooksPath=/dev/null", "-C", str(checkout), *args],
-                                        env=git_env, text=True, capture_output=True, timeout=15)
+            def g(repo, *args, date=None):
+                dated = dict(git_env, GIT_AUTHOR_DATE=date, GIT_COMMITTER_DATE=date) if date else git_env
+                result = subprocess.run([git, "-c", "core.hooksPath=/dev/null", "-c", "user.name=Smoke",
+                                         "-c", "user.email=smoke@example.invalid", "-C", str(repo), *args],
+                                        env=dated, text=True, capture_output=True, timeout=15)
                 assert result.returncode == 0, (args, result.stderr)
                 return result.stdout.strip()
 
-            g("init", "-q", "--initial-branch=feature")
-            g("add", "--all")
-            g("-c", "user.name=Smoke", "-c", "user.email=smoke@example.invalid", "commit", "-qm", "fixture")
+            def publish(name, date):
+                # A new commit on origin's alpha; the overlay source is untouched.
+                (seed / name).write_text(date + "\n")
+                g(seed, "add", name)
+                g(seed, "commit", "-qm", name, date=date)
+                g(seed, "push", "-q", str(origin_repo), "alpha")
+                return g(seed, "rev-parse", "HEAD")
+
+            g(seed, "init", "-q", "--initial-branch=alpha")
+            g(seed, "add", "--all")
+            g(seed, "commit", "-qm", "fixture", date="2026-01-01T00:00:00+07:00")
+            g(root, "clone", "-q", "--bare", str(seed), str(origin_repo))
+            g(root, "clone", "-q", str(origin_repo), str(clone))
             system, arch = subprocess.check_output(
                 [bun, "-e", "console.log(process.platform, process.arch)"], text=True).split()
             arch = {"x64": "amd64"}.get(arch, arch)
@@ -356,62 +373,110 @@ with tempfile.TemporaryDirectory(prefix="maw-update-") as temporary:
         passed += 1
 
         if language == "js":
-            # A source run never replaces anything. From a git checkout of this
-            # repository it prints the git commands, with real paths, instead.
+            # Unknown channel words are usage errors that name the one channel.
+            reset()
+            output = run("update", "beta", success=False)
+            assert 'unknown channel "beta"; only alpha is published' in output and output.endswith("  maw update alpha\n"), output
+            assert not requests and executable.read_bytes() == binaries["old"]
+            passed += 1
+            # `maw update alpha` on a release build is the same as `maw update`.
+            reset()
+            release()
+            output = run("update", "alpha")
+            assert output.endswith(f"status\tupdate available\nupdated\t{executable}\n"), output
+            assert executable.read_bytes() == binaries["new"]
+            passed += 1
+
+            # A dev build from a git checkout fast-forwards that checkout, which is
+            # the clone here: the checkout comes from the running source file.
             gitbin = root / "gitbin"
             gitbin.mkdir()
             (gitbin / "git").symlink_to(git)
             source_home = root / "source-home"
             source_home.mkdir()
             source_env = dict(env, HOME=str(source_home), USERPROFILE=str(source_home), PATH=str(gitbin),
-                              GIT_DIR=str(root / "not-a-repo"))
-            head = g("rev-parse", "HEAD")
+                              GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+            script = clone / "src/js/src/cli.ts"
+            quoted = shlex.quote(str(clone))
+            responses.clear()
+            requests.clear()
 
-            def source_run(script, *args, status=2):
-                result = subprocess.run([bun, str(script), "update", *args], cwd=source_home, env=source_env,
+            def source_run(*args, status=0, trap=False):
+                # trap: an inherited GIT_DIR must not redirect maw's git to another repository.
+                run_env = dict(source_env, GIT_DIR=str(root / "not-a-repo")) if trap else source_env
+                result = subprocess.run([bun, str(script), "update", *args], cwd=source_home, env=run_env,
                                         text=True, capture_output=True, timeout=60)
                 assert result.returncode == status, (args, result.returncode, result.stdout, result.stderr)
                 if status:
                     assert result.stderr.splitlines()[-1].startswith("  "), result.stderr
-                return result.stderr.splitlines() if status else result.stdout
+                assert not requests, "source checkout update reached the release server"
+                return result.stdout, result.stderr
 
-            def expect_checkout(lines, checkout_root, switch, dirty):
-                quoted = shlex.quote(str(checkout_root))
-                assert lines[0] == "maw: update: this maw runs from a source checkout; update it with git", lines
-                assert (f"  git -C {quoted} switch alpha" in lines) == switch, lines
-                assert any("uncommitted changes" in line for line in lines) == dirty, lines
-                assert lines[-1] == f"  git -C {quoted} pull --ff-only", lines
+            def state():
+                return (g(clone, "rev-parse", "HEAD"), g(clone, "rev-parse", "refs/remotes/origin/alpha"),
+                        g(clone, "symbolic-ref", "--quiet", "--short", "HEAD"), g(clone, "status", "--porcelain"))
 
-            for dirty, branch in ((False, "feature"), (True, "feature"), (False, "alpha")):
-                if branch == "alpha":
-                    g("switch", "-q", "-c", "alpha")
-                scratch = checkout / "scratch.txt"
-                if dirty:
-                    scratch.write_text("local work\n")
-                before = g("status", "--porcelain")
-                requests.clear()
-                expect_checkout(source_run(cli), checkout, branch != "alpha", dirty)
-                assert not requests, "source-checkout refusal reached the network"
-                assert g("rev-parse", "HEAD") == head and g("status", "--porcelain") == before, "checkout touched"
-                assert g("symbolic-ref", "--short", "HEAD") == branch
-                if dirty:
-                    assert scratch.read_text() == "local work\n"
-                    scratch.unlink()
-                passed += 1
-            # --check still reports release status from a source checkout.
-            release()
-            output = source_run(cli, "--check", status=0)
-            assert output == f"current\tdev\ntarget\t{tag}\ncommit\t{commit}\nstatus\tdev build (check only)\n", output
-            assert not any(path.endswith(".tar.gz") for path in requests), "--check downloaded executable"
+            def running(commit_hash, stamp):
+                return f"dev {stamp} ({g(clone, 'rev-parse', '--short', commit_hash)})"
+
+            first = g(clone, "rev-parse", "HEAD")
+            stdout, _ = source_run()
+            assert stdout == (f"current\t{running(first, 'v26.1.1-alpha.0')}\ntarget\torigin/alpha\n"
+                              f"commit\t{first}\nstatus\talready up to date\n"), stdout
+            assert state()[0] == first
             passed += 1
-            # The real CLI under smoke: refusal only, never --check (that would be GitHub).
-            real_root = next((parent for parent in entry.parents if (parent / ".git").exists()), None)
-            lines = source_run(entry)
-            if real_root and (real_root / "src/js/src/cli.ts").exists() and entry.is_relative_to(real_root / "src/js"):
-                assert lines[0] == "maw: update: this maw runs from a source checkout; update it with git", lines
-                assert lines[-1] == f"  git -C {shlex.quote(str(real_root))} pull --ff-only", lines
-            else:
-                assert lines[-1].startswith("  bun add --global "), lines
+            _, stderr = source_run("beta", status=2)
+            assert stderr.endswith("  maw update alpha\n") and state()[0] == first, stderr
+            passed += 1
+            second = publish("second.txt", "2026-01-02T12:34:00+07:00")
+            before = state()
+            stdout, _ = source_run("--check")
+            assert stdout == (f"current\t{running(first, 'v26.1.1-alpha.0')}\ntarget\torigin/alpha\n"
+                              f"commit\t{second}\nstatus\tupdate available: behind origin/alpha by 1\n"), stdout
+            assert state()[0] == before[0] and state()[2:] == before[2:], "--check changed the checkout"
+            passed += 1
+            stdout, _ = source_run()
+            assert stdout == (f"current\t{running(first, 'v26.1.1-alpha.0')}\ntarget\torigin/alpha\n"
+                              f"commit\t{second}\nstatus\tupdate available: behind origin/alpha by 1\n"
+                              f"updated\t{running(second, 'v26.1.2-alpha.1234')}\n"), stdout
+            assert state()[0] == second and state()[2] == "alpha"
+            passed += 1
+            third = publish("third.txt", "2026-01-03T09:05:00+07:00")
+            scratch = clone / "scratch.txt"
+            scratch.write_text("local work\n")
+            before = state()
+            stdout, stderr = source_run(status=1)
+            assert not stdout and "uncommitted changes" in stderr and stderr.endswith(f"  git -C {quoted} status\n"), stderr
+            assert state() == before and scratch.read_text() == "local work\n", "dirty tree touched (or fetched)"
+            scratch.unlink()
+            passed += 1
+            g(clone, "switch", "-q", "-c", "feature")
+            before = state()
+            _, stderr = source_run(status=1)
+            assert "feature has no upstream" in stderr and stderr.endswith("  maw update alpha\n"), stderr
+            assert state()[0] == before[0] and state()[2:] == before[2:]
+            passed += 1
+            stdout, _ = source_run("alpha", trap=True)
+            assert "status\tswitch feature -> alpha; update available: behind origin/alpha by 1\n" in stdout, stdout
+            assert "\nupdated\tdev" in stdout, stdout
+            assert state()[:3] == (third, third, "alpha"), "alpha was not switched to and fast-forwarded"
+            assert g(clone, "rev-parse", "feature") == second and not (root / "not-a-repo").exists()
+            passed += 1
+            fourth = publish("fourth.txt", "2026-01-04T18:00:00+07:00")
+            (clone / "local.txt").write_text("unpublished\n")
+            g(clone, "add", "local.txt")
+            g(clone, "commit", "-qm", "local", date="2026-01-04T19:00:00+07:00")
+            local = g(clone, "rev-parse", "HEAD")
+            stdout, _ = source_run("--check")
+            assert f"commit\t{fourth}\nstatus\tdiverged from origin/alpha (1 ahead, 1 behind); fast-forward impossible\n" in stdout, stdout
+            _, stderr = source_run(status=1)
+            assert stderr.endswith(f"  git -C {quoted} log --oneline --left-right HEAD...@{{upstream}}\n"), stderr
+            assert state()[:3] == (local, fourth, "alpha"), "diverged checkout was changed"
+            passed += 1
+            # The real CLI under smoke gets only usage errors: no git, no network.
+            result = subprocess.run([bun, str(entry), "update", "beta"], cwd=source_home, env=source_env,
+                                    text=True, capture_output=True, timeout=60)
+            assert result.returncode == 2 and result.stderr.endswith("  maw update alpha\n"), result.stderr
             passed += 1
         print(f"self-update smoke ({program}): {passed} process scenarios passed (local TLS, empty PATH)")
     finally:
