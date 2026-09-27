@@ -323,12 +323,14 @@ fn resolveInstalled(c: Context, name: []const u8, args: []const []const u8) !?Di
     return null;
 }
 
-// The short commit of a plugin directory that is its own Git checkout, for
-// `maw <plugin> version` (#52); null for anything else. `--show-prefix` prints
-// an empty line only at the top of a work tree, so an enclosing repository never
-// answers for a plugin inside it. Inherited GIT_* routing (a hook's GIT_DIR) is
-// dropped, GIT_OPTIONAL_LOCKS=0 keeps it from writing, and any failure or the
-// two-second timeout reads as "not a Git checkout".
+// The short commit of the Git work tree a plugin directory lies in, for
+// `maw <plugin> version` (#52); null when it lies in none. git runs inside the
+// directory, so a symlinked plugin reports the repository its target lives in,
+// even from a subfolder of a larger one. `rev-parse --short HEAD`, never
+// `describe`: plugin checkouts never fetch new tags, so describe goes stale.
+// Inherited GIT_* routing (a hook's GIT_DIR) is dropped, GIT_OPTIONAL_LOCKS=0
+// keeps it from writing, and any failure or the two-second timeout reads as
+// "not a Git checkout".
 fn shortCommit(c: Context, dir: []const u8) ?[]const u8 {
     var env = std.process.Environ.Map.init(c.a);
     var it = c.env.iterator();
@@ -337,15 +339,15 @@ fn shortCommit(c: Context, dir: []const u8) ?[]const u8 {
     };
     env.put("GIT_OPTIONAL_LOCKS", "0") catch return null;
     const result = std.process.run(c.a, c.io, .{
-        .argv = &.{ "git", "-C", dir, "rev-parse", "--show-prefix", "--short", "HEAD" },
+        .argv = &.{ "git", "-C", dir, "rev-parse", "--is-inside-work-tree", "--short", "HEAD" },
         .environ_map = &env,
         .stdout_limit = .limited(4096),
         .stderr_limit = .limited(65536),
         .timeout = .{ .duration = .{ .raw = .fromSeconds(2), .clock = .awake } },
     }) catch return null;
     if (result.term != .exited or result.term.exited != 0) return null;
-    if (result.stdout.len == 0 or result.stdout[0] != '\n') return null;
-    const hash = std.mem.trimEnd(u8, result.stdout[1..], "\n");
+    if (!std.mem.startsWith(u8, result.stdout, "true\n")) return null;
+    const hash = std.mem.trimEnd(u8, result.stdout["true\n".len..], "\n");
     if (hash.len < 4 or hash.len > 64) return null;
     for (hash) |b| if (!std.ascii.isDigit(b) and (b < 'a' or b > 'f')) return null;
     return hash;

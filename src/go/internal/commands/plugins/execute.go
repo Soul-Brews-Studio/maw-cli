@@ -16,19 +16,21 @@ import (
 
 var (
 	commandName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-	shortCommit = regexp.MustCompile(`^\n([0-9a-f]{4,64})\n?$`)
+	shortCommit = regexp.MustCompile(`^true\n([0-9a-f]{4,64})\n?$`)
 )
 
-// pluginCommit returns the short commit of a plugin directory that is its own
-// Git checkout, for `maw <plugin> version` (#52), or "" for anything else.
-// `--show-prefix` prints an empty line only at the top of a work tree, so an
-// enclosing repository never answers for a plugin inside it. Inherited GIT_*
-// routing (a hook's GIT_DIR) is dropped, GIT_OPTIONAL_LOCKS=0 keeps it from
-// writing, and any failure or the two-second timeout reads as "not a Git checkout".
+// pluginCommit returns the short commit of the Git work tree a plugin directory
+// lies in, for `maw <plugin> version` (#52), or "" when it lies in none. git runs
+// inside the directory, so a symlinked plugin reports the repository its target
+// lives in, even from a subfolder of a larger one. `rev-parse --short HEAD`, never
+// `describe`: plugin checkouts never fetch new tags, so describe goes stale.
+// Inherited GIT_* routing (a hook's GIT_DIR) is dropped, GIT_OPTIONAL_LOCKS=0
+// keeps it from writing, and any failure or the two-second timeout reads as
+// "not a Git checkout".
 func pluginCommit(ctx context.Context, dir string) string {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--show-prefix", "--short", "HEAD")
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--is-inside-work-tree", "--short", "HEAD")
 	cmd.Env = []string{"GIT_OPTIONAL_LOCKS=0"}
 	for _, value := range os.Environ() {
 		if !strings.HasPrefix(value, "GIT_") {

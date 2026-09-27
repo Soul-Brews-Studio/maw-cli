@@ -429,12 +429,14 @@ pub fn run(args: &[OsString], legacy: bool) -> i32 {
     }
 }
 
-// The short commit of a plugin directory that is its own Git checkout, for
-// `maw <plugin> version` (#52); None for anything else. `--show-prefix` prints
-// an empty line only at the top of a work tree, so an enclosing repository never
-// answers for a plugin inside it. Inherited GIT_* routing (a hook's GIT_DIR) is
-// dropped, GIT_OPTIONAL_LOCKS=0 keeps it from writing, and any failure or the
-// two-second timeout reads as "not a Git checkout".
+// The short commit of the Git work tree a plugin directory lies in, for
+// `maw <plugin> version` (#52); None when it lies in none. git runs inside the
+// directory, so a symlinked plugin reports the repository its target lives in,
+// even from a subfolder of a larger one. `rev-parse --short HEAD`, never
+// `describe`: plugin checkouts never fetch new tags, so describe goes stale.
+// Inherited GIT_* routing (a hook's GIT_DIR) is dropped, GIT_OPTIONAL_LOCKS=0
+// keeps it from writing, and any failure or the two-second timeout reads as
+// "not a Git checkout".
 fn short_commit(dir: &Path) -> Option<String> {
     let mut cmd = std::process::Command::new("git");
     for (key, _) in std::env::vars_os() {
@@ -446,7 +448,7 @@ fn short_commit(dir: &Path) -> Option<String> {
         .env("GIT_OPTIONAL_LOCKS", "0")
         .arg("-C")
         .arg(dir)
-        .args(["rev-parse", "--show-prefix", "--short", "HEAD"])
+        .args(["rev-parse", "--is-inside-work-tree", "--short", "HEAD"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -466,7 +468,7 @@ fn short_commit(dir: &Path) -> Option<String> {
     };
     let mut out = String::new();
     child.stdout.take()?.read_to_string(&mut out).ok()?;
-    let hash = out.strip_prefix('\n')?;
+    let hash = out.strip_prefix("true\n")?;
     let hash = hash.strip_suffix('\n').unwrap_or(hash);
     let valid = status.success()
         && (4..=64).contains(&hash.len())
