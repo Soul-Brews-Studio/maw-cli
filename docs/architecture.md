@@ -47,7 +47,9 @@ Zig independently implement the same [global inventory contract](installed-plugi
 Unknown-command dispatch reuses that inventory for explicitly declared standalone
 Bun CLIs. Go calls `commands/plugins.ExecuteInstalled`, Rust `inventory::execute`,
 Bun `mod.executeInstalled` → `mod.findBun`/`mod.execute`, and Zig
-`inventory.resolve` → `Host.execute`. This fallback runs after built-ins/PATH;
+`inventory.resolve` → `Host.execute`. This fallback runs after built-ins/PATH and
+resolves a plugin by command before [alias](plugin-lifecycle.md#plugin-aliases-clialiases)
+(Go `resolveInstalled`, Rust `resolve`, Bun `mod.resolveInstalled`, Zig `pick`);
 it does not import plugin modules or turn listing into runtime loading.
 The same functions answer the [reserved `version` verb](plugin-lifecycle.md#reserved-plugin-verb-version)
 from the manifest, reading the commit through Go `pluginCommit`, Rust

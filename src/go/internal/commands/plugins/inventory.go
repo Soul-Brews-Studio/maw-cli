@@ -17,6 +17,7 @@ type installed struct {
 	Command, Runtime, Target, Entry string
 	Interactive                     bool
 	Enabled, CLI, API, Missing      bool
+	Aliases                         []string // cli.aliases: dispatch names after commands (#55)
 }
 
 func safePath(path string) string {
@@ -187,6 +188,12 @@ func scanInstalled(root string, disabled map[string]bool, stderr io.Writer) ([]i
 				p.Command = name
 			}
 			p.Interactive, _ = cli["interactive"].(bool)
+			aliases, _ := cli["aliases"].([]any)
+			for _, value := range aliases {
+				if alias, _ := value.(string); alias != "" {
+					p.Aliases = append(p.Aliases, alias)
+				}
+			}
 		}
 		p.Runtime, p.Target = stringField(m, "runtime"), stringField(m, "target")
 		p.Missing = p.CLI && executable == ""

@@ -133,9 +133,9 @@ The manifest `version` is already mandatory, so no plugin can forget it.
 
 - Applies only when dispatch has resolved an enabled installed plugin the way it
   resolves any verb, and `version` or `--version` is the **only** argument.
-  Resolution is by `cli.command` (which may differ from the manifest name) or, in
-  js, a `cli.aliases` entry (`maw at version`); go, rs and zig do not read
-  `cli.aliases` for any verb yet. A folder name is never a way in: a stray copy
+  Resolution is by `cli.command` (which may differ from the manifest name) or a
+  `cli.aliases` entry (`maw at version`), in all four ports; see
+  [plugin aliases](#plugin-aliases-clialiases). A folder name is never a way in: a stray copy
   such as `herdrbak/` declaring an existing name is not answered.
   `maw atlas version 2`, `maw atlas foo version` and `maw atlas -v` still reach
   the plugin unchanged.
@@ -164,3 +164,46 @@ the native package from its CI separately, or explicitly run the complete source
 checkout with `serve --build` and Go installed. There is no automatic compiler
 fallback. Git-blob verification does not replace Herdr's bundled-helper SHA-256
 verification.
+
+## Plugin aliases: `cli.aliases`
+
+```console
+$ maw at version
+atlas 26.9.28-0457 (f7a2b95)
+$ maw dup
+maw: "dup" is an alias of 2 plugins (dup-one, dup-two); neither runs. Run one by name:
+  maw dup-one
+  maw dup-two
+```
+
+A manifest may declare `"cli": {"aliases": ["at"]}`. All four ports resolve a
+verb in this order, first match wins (#55):
+
+1. built-in command
+2. `maw-<verb>` on `PATH`
+3. installed plugin whose `cli.command` (else manifest `name`) is the verb,
+   first in inventory order (tier, then name)
+4. installed plugin declaring the verb in `cli.aliases`
+5. default plugin (js only, #39)
+
+- An alias never shadows a built-in, a `PATH` executable, a reserved host name
+  (`go`, `rs`, `js`, `zig`, `index`) or another plugin's command, whatever the
+  inventory order.
+- An alias that two or more **enabled** plugins declare runs none of them. The
+  host names every holder, prints the command that runs each by name with the
+  original arguments shell-quoted, and exits 2. This happens before the default
+  plugin is consulted and before the reserved `version` verb is answered.
+- A disabled plugin answers by alias exactly as by name (`plugin atlas is
+  disabled`, exit 1), but only when no enabled plugin declares the alias; a
+  disabled holder never makes an alias ambiguous.
+- `maw <alias> version` is answered by the host with the manifest name, like
+  the command; `maw help <alias>` and `maw <alias> --help` forward `--help`.
+- Before #55 js took the first plugin in inventory order that matched by
+  command **or** alias, so an earlier plugin's alias could shadow a later
+  plugin's command and a duplicate alias silently ran the first holder. js now
+  follows the order above like the other ports.
+- utils/scripts/dispatch-smoke.py holds every port to it: alias dispatch with
+  argv, streams, cwd and exit code; alias `version` and `--help`; a built-in, a
+  `PATH` executable, a reserved name and another plugin's command each beating
+  an alias; the exact ambiguity message with neither holder run; and disabled
+  holders by alias.
