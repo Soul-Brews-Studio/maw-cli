@@ -61,3 +61,68 @@ read-only checks, malformed/corrupt payloads, candidate proof failure and
 source/downgrade decisions with an empty runtime PATH. No unit framework.
 
 Source ancestry API: [GitHub compare-two-commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
+
+## js port (`maw-js update`)
+
+```sh
+maw-js update --check          # also: maw-js update alpha --check
+maw-js update                  # same as: maw-js update alpha
+maw-js update --version v26.9.28-alpha.348
+```
+
+`alpha` is the only published channel and also the branch name, so the optional
+channel word means the same for both install kinds; no word means alpha, and any
+other word is a usage error that prints `maw update alpha`.
+
+### Prebuilt (standalone) maw-js
+
+A port of the contract above, command for command, using only Bun/Node
+built-ins (`fetch`, `node:zlib`, `node:crypto`) and a hand-written tar reader.
+Same selection, `current`/`target`/`commit`/`status`/`updated` lines, size
+limits, redirect-host allowlist, 90 s download and 3 min overall deadlines,
+exact-member archive rules (`maw-js` and `RELEASE.json` only, metadata
+`language` `js`), candidate `version` proof and single same-directory rename.
+Differences, all deliberate:
+
+- `release.json` must also carry `skip: false`, as every published plan does.
+- maw-js embeds only a release tag or `dev`, so there is no pseudo-version or
+  Go companion-tag branch; any other embedded string is reported as unrecognized.
+- Only a standalone executable replaces itself. A script run has the bun
+  runtime as its `process.execPath` and never replaces an executable.
+- Every failure ends with a copy-pasteable command that fixes or narrows it
+  (for example the `curl -sSIL` of the URL that failed, or the stale lock's `rmdir`).
+
+### Source checkout (`bun link`, `bun src/js/src/cli.ts`)
+
+A `dev` build running from a git checkout of this repository updates the
+checkout, found by walking up from the running source file, by fast-forward
+only. It never forces, resets or stashes.
+
+- A dirty tree (`git status --porcelain` non-empty) is refused before anything
+  runs, with `git -C <checkout> status` as the fix.
+- `git -C <checkout> fetch origin`, no prompts, bounded by a timeout.
+- `maw update`: `merge --ff-only` the current branch's upstream. No upstream,
+  a detached HEAD or a diverged branch is refused with the command to run
+  (`maw update alpha`, or `git -C <checkout> log --oneline --left-right HEAD...@{upstream}`).
+- `maw update alpha`: when on another branch, `switch alpha` first, then
+  fast-forward alpha from `origin/alpha`. Divergence is checked before switching.
+- `current`/`target`/`commit`/`status`, then `updated`, using the dev CalVer of
+  `maw version` (`dev v26.9.28-alpha.358 (2672b54)`).
+- `--check` fetches and reports behind/ahead; the branch and tree stay as they are.
+- `--version` pins release builds only; a checkout is told the
+  `git -C <checkout> switch --detach <tag>` to run itself.
+
+A `dev` build outside a checkout (for example `bun add --global`) is refused
+with the `bun add --global` reinstall command; its `--check` reports release status.
+
+### Verification
+
+`python3 utils/scripts/update-smoke.py -- BUN ENTRY` (run by `smoke.sh` for the
+source-run js port) copies `src/js/src` into a throwaway seed repository,
+rewrites only the origins there, compiles fixture executables with
+`bun build --compile` and serves releases over local TLS, the same overlay
+approach as Go. Source-checkout cases run the overlay from a clone of a bare
+local origin: up to date, behind and fast-forwarded, dirty, no upstream,
+`alpha` from another branch, `--check`, diverged and an unknown channel. It
+replaces only copies in a temporary directory; the real ENTRY only receives a
+usage error, never an update or `--check`, which would touch its checkout or GitHub.

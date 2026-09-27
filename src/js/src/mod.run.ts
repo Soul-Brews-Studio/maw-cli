@@ -10,6 +10,7 @@ import { pluginLifecycle } from "./mod.pluginLifecycle";
 import { marketplace } from "./mod.marketplace";
 import { locate } from "./mod.locate";
 import { defaultCommand } from "./mod.defaultCommand";
+import { update, updateSummary, updateUsage } from "./mod.update";
 import { readDefaultPlugin } from "./mod.defaultPlugin";
 import { inventoryPaths } from "./mod.inventoryPaths";
 import type { Command } from "./types";
@@ -40,6 +41,7 @@ export async function run(args: string[]): Promise<number> {
     usage: "maw locate <oracle> [--path | --json] [--no-remote]",
     run: locate,
   });
+  registry.set("update", { name: "update", summary: updateSummary, usage: updateUsage, run: update });
   for (const [name, path] of discover()) {
     if (registry.has(name)) continue;
     registry.set(name, { name, path, summary: "External plugin", run: (args) => execute(path, args) });

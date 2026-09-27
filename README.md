@@ -9,7 +9,7 @@ Choose one implementation. Go adds `context`, verified self-`update`, detailed
 marketplace rows and plugin `@`/`#` selectors. All ports share the basic
 help/version/plugin contract.
 
-**Install, then update? Choose Go: only `maw-go` supports self-update.**
+**Install, then update? Choose Go, or the prebuilt `maw-js`: only those self-update.**
 The pinned install examples below use the published
 [v26.9.19-alpha.2047](https://github.com/Soul-Brews-Studio/maw-cli/releases/tag/v26.9.19-alpha.2047)
 release, not a promise of the latest version. These install language-specific
@@ -138,7 +138,8 @@ once more. Self-update supports native Go-installed/prebuilt
 executables on Linux/macOS, amd64/arm64. It downloads the matching prebuilt,
 verifies checksums, metadata and its exact version, then replaces only the
 current executable. No Go compiler, curl, tar or Git is needed for self-update.
-Plugins/configuration stay untouched; other ports do not have this command yet.
+Plugins/configuration stay untouched. The prebuilt `maw-js` has the same command
+(`maw-js update [alpha] [--check] [--version TAG]`); Rust and Zig do not have it yet.
 Local `dev`/`go run` builds can only `--check`. A newer source install waits for
 a published release instead of silently downgrading. [Update contract](docs/self-update.md).
 
@@ -174,8 +175,11 @@ export PATH="$HOME/.local/bin:$PATH"
 maw-zig --help
 ```
 
-Bun, Rust and Zig do **not** support self-`update` yet. Install a newer published
-tag using the corresponding command instead. `plugin update` updates a plugin,
+Rust and Zig do **not** self-`update`, nor does a Bun install from the Git package.
+Install a newer published tag using the corresponding command instead. A Bun run
+from a git checkout (`bun link`) is the exception: `maw-js update` fast-forwards
+that checkout, and `maw-js update alpha` switches it to alpha first; a dirty or
+diverged tree is refused ([contract](docs/self-update.md)). `plugin update` updates a plugin,
 not the host CLI. Bun/Rust source installs may report `dev`; a source tag pin is
 not necessarily an embedded release version. Prebuilt executables embed CalVer.
 

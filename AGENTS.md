@@ -109,8 +109,11 @@ must remain a relative symlink to `AGENTS.md`, not a separate copy.
   no default source downgrade, and no plugin/config/cache changes. `--check`
   never installs; local dev builds do not self-replace. Go-installed binaries
   can transition to prebuilts. Never point tests at the user's executable;
-  update-smoke.py uses source overlays/local TLS/copied binaries. Other ports
-  do not yet self-update. No new runtime libraries/system tools were approved.
+  update-smoke.py uses source overlays/local TLS/copied binaries. The js port
+  self-updates too (#44): a compiled maw-js replaces itself the same way, and a
+  source checkout is only ever fast-forwarded (dirty or diverged is refused, never
+  reset, stashed or forced). rs and zig do not yet self-update. No new runtime
+  libraries/system tools were approved.
 - Installed command dispatch is a separate, explicit subprocess operation after
   builtin/PATH lookup. Reuse inventory selection and disabled state. Only standalone
   Bun scripts declaring `runtime=bun-dev`, `target=js`, `cli.interactive=true` are
