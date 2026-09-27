@@ -6,6 +6,7 @@ import { disabledPlugins } from "./mod.disabledPlugins";
 import { scanInstalledPlugins } from "./mod.scanInstalledPlugins";
 import { findBun } from "./mod.findBun";
 import { execute } from "./mod.execute";
+import { pluginCommit } from "./mod.pluginCommit";
 
 // Two plugin shapes exist in the wild. Script-style plugins do their work at
 // import time; SDK-style ones export a handler and do nothing until it is
@@ -34,6 +35,11 @@ export async function executeInstalled(name: string, args: string[]): Promise<nu
     if (!plugin.enabled) {
       console.error(`maw: plugin ${plugin.name} is disabled`);
       return 1;
+    }
+    // Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
+    if (args.length === 1 && (args[0] === "version" || args[0] === "--version")) {
+      console.log(`${plugin.name} ${plugin.version} (${pluginCommit(plugin.dir) || "not a Git checkout"})`);
+      return 0;
     }
     if (!plugin.entry || plugin.missing) {
       console.error(`maw: plugin ${plugin.name} entry is missing or not a regular file`);

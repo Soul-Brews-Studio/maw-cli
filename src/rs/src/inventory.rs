@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::time::{Duration, Instant};
 
 type Object = Map<String, Value>;
 type Result<T> = std::result::Result<T, String>;
@@ -427,6 +429,55 @@ pub fn run(args: &[OsString], legacy: bool) -> i32 {
     }
 }
 
+// The short commit of a plugin directory that is its own Git checkout, for
+// `maw <plugin> version` (#52); None for anything else. `--show-prefix` prints
+// an empty line only at the top of a work tree, so an enclosing repository never
+// answers for a plugin inside it. Inherited GIT_* routing (a hook's GIT_DIR) is
+// dropped, GIT_OPTIONAL_LOCKS=0 keeps it from writing, and any failure or the
+// two-second timeout reads as "not a Git checkout".
+fn short_commit(dir: &Path) -> Option<String> {
+    let mut cmd = std::process::Command::new("git");
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("GIT_") {
+            cmd.env_remove(key);
+        }
+    }
+    let mut child = cmd
+        .env("GIT_OPTIONAL_LOCKS", "0")
+        .arg("-C")
+        .arg(dir)
+        .args(["rev-parse", "--show-prefix", "--short", "HEAD"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let mut out = String::new();
+    child.stdout.take()?.read_to_string(&mut out).ok()?;
+    let hash = out.strip_prefix('\n')?;
+    let hash = hash.strip_suffix('\n').unwrap_or(hash);
+    let valid = status.success()
+        && (4..=64).contains(&hash.len())
+        && hash.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'));
+    if valid {
+        Some(hash.to_owned())
+    } else {
+        None
+    }
+}
+
 // Called only after builtin and PATH command lookup has failed.
 pub fn execute(name: &str, args: &[OsString]) -> Option<i32> {
     if !name
@@ -457,6 +508,13 @@ pub fn execute(name: &str, args: &[OsString]) -> Option<i32> {
     };
     if !plugin.enabled {
         return fail(1, "is disabled");
+    }
+    // Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
+    if args.len() == 1 && (args[0] == "version" || args[0] == "--version") {
+        let commit = short_commit(&plugin.dir);
+        let commit = commit.as_deref().unwrap_or("not a Git checkout");
+        println!("{} {} ({})", plugin.name, plugin.version, commit);
+        return Some(0);
     }
     if plugin.runtime != "bun-dev" || plugin.target != "js" || !plugin.interactive {
         return fail(126, "is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)");

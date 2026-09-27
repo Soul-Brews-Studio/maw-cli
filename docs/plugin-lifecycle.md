@@ -118,6 +118,39 @@ do not become native packages merely by extracting them.
   still lists. Missing/unknown arguments exit 2; operational failures exit 1.
   Listing/help stay read-only. No shell interpolation of plugin input.
 
+## Reserved plugin verb: `version`
+
+```console
+$ maw atlas version
+atlas 26.9.28-0457 (eb9a4a1)
+$ maw plain --version
+plain 0.1.0 (not a Git checkout)
+```
+
+`version` and `--version` are reserved plugin verbs: the host answers them from
+the installed `plugin.json`, in all four ports, and runs no plugin code (#52).
+The manifest `version` is already mandatory, so no plugin can forget it.
+
+- Applies only when dispatch has resolved an enabled installed plugin by its
+  `cli.command` (which may differ from its name) or, in js, a `cli.aliases`
+  entry, and `version` or `--version` is the **only** argument.
+  `maw atlas version 2`, `maw atlas foo version` and `maw atlas -v` still reach
+  the plugin unchanged.
+- Prints `<name> <version> (<short commit>)` with the manifest `name`, whatever
+  command invoked it, and exits 0. The commit comes from
+  `git rev-parse --show-prefix --short HEAD` with `GIT_OPTIONAL_LOCKS=0`,
+  inherited `GIT_*` variables removed and a two-second timeout. The plugin
+  directory must be the top of its own work tree. A plugin inside an enclosing
+  repository, an unborn HEAD, a missing or hanging git, or any other git failure
+  prints `(not a Git checkout)` instead; it is never an error.
+- A disabled plugin still refuses exactly as it does for any other verb. A
+  `maw-<name>` executable on PATH has no manifest and receives `version` as an
+  ordinary argument.
+- utils/scripts/dispatch-smoke.py covers it in every port: a plugin whose code
+  would print a sentinel answers without it, an alias answers, extra arguments
+  reach the plugin, and Git checkout, enclosing repository, hanging git and
+  missing git each give the right suffix.
+
 Git installation does **not** download native prebuilts. For Herdr serving, use
 the native package from its CI separately, or explicitly run the complete source
 checkout with `serve --build` and Go installed. There is no automatic compiler

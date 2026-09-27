@@ -47,6 +47,7 @@ const Host = struct {
         const result = try inventory.resolve(self.allocator, self.io, self.env, name, args) orelse return self.unknown(name);
         return switch (result) {
             .failure => |code| code,
+            .answered => 0,
             .argv => |argv| self.execute(argv[0], argv[1..]),
         };
     }

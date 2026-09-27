@@ -271,7 +271,7 @@ fn execute(c: Context, verbose: bool, all: bool) !u8 {
     return 0;
 }
 
-pub const Dispatch = union(enum) { failure: u8, argv: []const []const u8 };
+pub const Dispatch = union(enum) { failure: u8, argv: []const []const u8, answered };
 
 pub fn resolve(a: std.mem.Allocator, io: std.Io, env: *const std.process.Environ.Map, name: []const u8, args: []const []const u8) !?Dispatch {
     if (name.len == 0 or name[0] < 'a' or name[0] > 'z') return null;
@@ -297,6 +297,11 @@ fn resolveInstalled(c: Context, name: []const u8, args: []const []const u8) !?Di
             try c.out(.stderr(), "maw: plugin {s} is disabled\n", .{p.name});
             return Dispatch{ .failure = 1 };
         }
+        // Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
+        if (args.len == 1 and (eql(args[0], "version") or eql(args[0], "--version"))) {
+            try c.out(.stdout(), "{s} {s} ({s})\n", .{ p.name, p.version, shortCommit(c, p.dir) orelse "not a Git checkout" });
+            return .answered;
+        }
         if (!eql(p.runtime, "bun-dev") or !eql(p.target, "js") or !p.interactive) {
             try c.out(.stderr(), "maw: plugin {s} is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)\n", .{p.name});
             return Dispatch{ .failure = 126 };
@@ -316,6 +321,34 @@ fn resolveInstalled(c: Context, name: []const u8, args: []const []const u8) !?Di
         return Dispatch{ .argv = argv };
     }
     return null;
+}
+
+// The short commit of a plugin directory that is its own Git checkout, for
+// `maw <plugin> version` (#52); null for anything else. `--show-prefix` prints
+// an empty line only at the top of a work tree, so an enclosing repository never
+// answers for a plugin inside it. Inherited GIT_* routing (a hook's GIT_DIR) is
+// dropped, GIT_OPTIONAL_LOCKS=0 keeps it from writing, and any failure or the
+// two-second timeout reads as "not a Git checkout".
+fn shortCommit(c: Context, dir: []const u8) ?[]const u8 {
+    var env = std.process.Environ.Map.init(c.a);
+    var it = c.env.iterator();
+    while (it.next()) |e| if (!std.mem.startsWith(u8, e.key_ptr.*, "GIT_")) {
+        env.put(e.key_ptr.*, e.value_ptr.*) catch return null;
+    };
+    env.put("GIT_OPTIONAL_LOCKS", "0") catch return null;
+    const result = std.process.run(c.a, c.io, .{
+        .argv = &.{ "git", "-C", dir, "rev-parse", "--show-prefix", "--short", "HEAD" },
+        .environ_map = &env,
+        .stdout_limit = .limited(4096),
+        .stderr_limit = .limited(65536),
+        .timeout = .{ .duration = .{ .raw = .fromSeconds(2), .clock = .awake } },
+    }) catch return null;
+    if (result.term != .exited or result.term.exited != 0) return null;
+    if (result.stdout.len == 0 or result.stdout[0] != '\n') return null;
+    const hash = std.mem.trimEnd(u8, result.stdout[1..], "\n");
+    if (hash.len < 4 or hash.len > 64) return null;
+    for (hash) |b| if (!std.ascii.isDigit(b) and (b < 'a' or b > 'f')) return null;
+    return hash;
 }
 
 fn findBun(c: Context) !?[]const u8 {

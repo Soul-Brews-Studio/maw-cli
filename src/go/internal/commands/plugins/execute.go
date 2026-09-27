@@ -10,9 +10,41 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strings"
+	"time"
 )
 
-var commandName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+var (
+	commandName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	shortCommit = regexp.MustCompile(`^\n([0-9a-f]{4,64})\n?$`)
+)
+
+// pluginCommit returns the short commit of a plugin directory that is its own
+// Git checkout, for `maw <plugin> version` (#52), or "" for anything else.
+// `--show-prefix` prints an empty line only at the top of a work tree, so an
+// enclosing repository never answers for a plugin inside it. Inherited GIT_*
+// routing (a hook's GIT_DIR) is dropped, GIT_OPTIONAL_LOCKS=0 keeps it from
+// writing, and any failure or the two-second timeout reads as "not a Git checkout".
+func pluginCommit(ctx context.Context, dir string) string {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--show-prefix", "--short", "HEAD")
+	cmd.Env = []string{"GIT_OPTIONAL_LOCKS=0"}
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "GIT_") {
+			cmd.Env = append(cmd.Env, value)
+		}
+	}
+	cmd.WaitDelay = time.Second
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	if match := shortCommit.FindSubmatch(output); match != nil {
+		return string(match[1])
+	}
+	return ""
+}
 
 // ExecuteInstalled resolves a standalone installed CLI only after builtin/PATH lookup.
 func ExecuteInstalled(ctx context.Context, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, bool) {
@@ -42,6 +74,15 @@ func ExecuteInstalled(ctx context.Context, name string, args []string, stdin io.
 		}
 		if !p.Enabled {
 			return fail(1, "is disabled")
+		}
+		// Reserved verb (#52): the host answers from plugin.json; no plugin code runs.
+		if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
+			commit := pluginCommit(ctx, p.Dir)
+			if commit == "" {
+				commit = "not a Git checkout"
+			}
+			fmt.Fprintf(stdout, "%s %s (%s)\n", p.Name, p.Version, commit)
+			return 0, true
 		}
 		if p.Runtime != "bun-dev" || p.Target != "js" || !p.Interactive {
 			return fail(126, "is not a standalone Bun CLI (requires runtime=bun-dev, target=js, cli.interactive=true)")
