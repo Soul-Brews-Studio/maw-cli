@@ -13,6 +13,7 @@
 | `maw plugins`, `maw plugins ls` | Compatibility aliases for `maw plugin ls` |
 | `maw <external> [args...]` | Run a discovered `maw-<external>` executable |
 | `maw <installed> [args...]` | Fall back to an installed standalone Bun CLI |
+| `maw <installed> version`, `maw <installed> --version` | Host prints the manifest name, version and short commit; no plugin code runs ([reserved verb](plugin-lifecycle.md#reserved-plugin-verb-version)) |
 
 ## Installed metadata versus executable commands
 

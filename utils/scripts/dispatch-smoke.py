@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 command = sys.argv[1:]
 if command[:1] == ["--"]:
@@ -90,9 +91,90 @@ sys.exit(7)
         os.close(slave)
     marker.unlink()
 
+    # `version` or `--version` as the ONLY argument is a reserved plugin verb:
+    # the host answers from plugin.json and never runs plugin code (#52).
+    sentinel = "PLUGIN-CODE-RAN"
+    versioned = manifest("versioned", "versioned", version="2.5.0-rc.1")
+    (versioned / "entry.mjs").write_text(f"console.log('{sentinel}');\nprocess.exit(3);\n")
+    real_git = shutil.which("git")
+    assert real_git, "dispatch smoke needs git on PATH"
+    git_link = binaries / "git"
+    git_link.symlink_to(real_git)  # present, so "not a Git checkout" is a real answer
+
+    def answers(args, expected):
+        result = run(args)
+        assert result.stdout == expected + "\n" and result.stderr == "", (args, result)
+        assert sentinel not in result.stdout + result.stderr, (args, result)
+        assert not marker.exists(), ("version executed plugin code", args)
+
+    fixture_git = {k: v for k, v in env.items() if not k.startswith("GIT_")}
+    fixture_git.update(PATH=os.environ.get("PATH", ""), GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+
+    def git(directory, *args):
+        return subprocess.run([real_git, "-C", str(directory), "-c", "user.name=maw", "-c", "user.email=maw@localhost",
+                               *args], env=fixture_git, check=True, capture_output=True, text=True).stdout.strip()
+
+    outside = subprocess.run([real_git, "-C", str(root), "rev-parse", "--is-inside-work-tree"],
+                             env=fixture_git, capture_output=True).returncode != 0
+    assert outside, (f"fixture root {root} is inside a Git work tree, so every plugin would show its commit; "
+                     f"rerun from a temporary directory outside one:\n  TMPDIR=\"$(mktemp -d /tmp/maw-dispatch-XXXX)\" "
+                     f"python3 utils/scripts/dispatch-smoke.py -- {' '.join(command)}")
+
+    for verb in ("version", "--version"):
+        answers(["versioned", verb], "versioned 2.5.0-rc.1 (not a Git checkout)")
+        answers(["alias", verb], "other-name 1 (not a Git checkout)")  # manifest name, not the command
+    for extra in (["version", "extra"], ["--version", "extra"], ["foo", "version"], ["-v"]):
+        result = run(["versioned"] + extra, 7)
+        assert json.loads(result.stdout)["argv"] == [str(versioned / "entry.mjs")] + extra, result.stdout
+        marker.unlink()
+    # Only dispatch's own name/alias resolution answers, never a raw folder name:
+    # a stray copy declaring an existing name (a "herdrbak") and a folder named
+    # unlike its manifest are reachable only by what their manifests declare.
+    manifest("versionedbak", "versioned", version="0.4.0")
+    manifest("folder-only", "manifest-only")
+    for stray in ("versionedbak", "folder-only"):
+        assert "unknown command" in run([stray, "version"], 2).stderr
+    answers(["versioned", "version"], "versioned 2.5.0-rc.1 (not a Git checkout)")
+    answers(["manifest-only", "version"], "manifest-only 1 (not a Git checkout)")
+    for folder in ("versionedbak", "folder-only"):
+        shutil.rmtree(plugins / folder)
+
+    checkout = manifest("checkout", "checkout", version="3.0.0")
+    git(checkout, "init", "-q")
+    git(checkout, "commit", "-q", "--allow-empty", "-m", "fixture")
+    short = git(checkout, "rev-parse", "--short", "HEAD")
+    for verb in ("version", "--version"):
+        answers(["checkout", verb], f"checkout 3.0.0 ({short})")
+    # A plugin symlinked from a subfolder of a larger repository answers with that
+    # repository's commit (installed plugins such as relic are shaped this way).
+    monorepo = root / "monorepo"
+    (monorepo / "tools").mkdir(parents=True)
+    shutil.move(str(manifest("linked", "linked", version="4.0.0")), str(monorepo / "tools" / "linked"))
+    (plugins / "linked").symlink_to(monorepo / "tools" / "linked", target_is_directory=True)
+    git(monorepo, "init", "-q")
+    git(monorepo, "add", ".")
+    git(monorepo, "commit", "-q", "-m", "monorepo")
+    answers(["linked", "version"], f"linked 4.0.0 ({git(monorepo, 'rev-parse', '--short', 'HEAD')})")
+    # Any enclosing work tree answers; a nested checkout still answers for itself.
+    git(root, "init", "-q")
+    git(root, "commit", "-q", "--allow-empty", "-m", "enclosing")
+    enclosing = git(root, "rev-parse", "--short", "HEAD")
+    answers(["versioned", "version"], f"versioned 2.5.0-rc.1 ({enclosing})")
+    answers(["checkout", "version"], f"checkout 3.0.0 ({short})")
+    shutil.rmtree(root / ".git")
+    # A git that hangs is cut short and falls back; no git at all falls back too.
+    git_link.unlink()
+    git_link.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(30)\n")
+    git_link.chmod(0o755)
+    started = time.monotonic()
+    answers(["checkout", "version"], "checkout 3.0.0 (not a Git checkout)")
+    assert time.monotonic() - started < 8, "git timeout is not short"
+    git_link.unlink()
+    answers(["checkout", "version"], "checkout 3.0.0 (not a Git checkout)")
+
     disabled = config / "maw.config.10.json"
     disabled.write_text(json.dumps(dict(disabledPlugins=["probe", "other-name"])))
-    for args in (["probe"], ["help", "probe"], ["alias"]):
+    for args in (["probe"], ["help", "probe"], ["alias"], ["probe", "version"], ["alias", "--version"]):
         assert "disabled" in run(args, 1).stderr
     manifest("shadow", "z-shadow", cli=dict(command="probe", interactive=True))
     assert "plugin probe is disabled" in run(["probe"], 1).stderr
@@ -166,5 +248,8 @@ process.exitCode=9;
         result = run(["probe"] + passthrough, 9, stdin="actual input")
         assert json.loads(result.stdout) == dict(args=passthrough, input="actual input", cwd=str(root.resolve()))
         assert result.stderr == "real Bun stderr\n"
+        # Real Bun would print the sentinel; `version` alone must not reach it.
+        assert run(["versioned", "version", "extra"], 3).stdout == sentinel + "\n"
+        answers(["versioned", "version"], "versioned 2.5.0-rc.1 (not a Git checkout)")
 
-print("dispatch smoke: installed Bun scripts, alias/help, args/streams/cwd/exit, gating and precedence OK")
+print("dispatch smoke: installed Bun scripts, alias/help, reserved version verb, args/streams/cwd/exit, gating and precedence OK")

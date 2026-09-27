@@ -118,6 +118,47 @@ do not become native packages merely by extracting them.
   still lists. Missing/unknown arguments exit 2; operational failures exit 1.
   Listing/help stay read-only. No shell interpolation of plugin input.
 
+## Reserved plugin verb: `version`
+
+```console
+$ maw atlas version
+atlas 26.9.28-0457 (f7a2b95)
+$ maw today --version
+today 0.3.0 (not a Git checkout)
+```
+
+`version` and `--version` are reserved plugin verbs: the host answers them from
+the installed `plugin.json`, in all four ports, and runs no plugin code (#52).
+The manifest `version` is already mandatory, so no plugin can forget it.
+
+- Applies only when dispatch has resolved an enabled installed plugin the way it
+  resolves any verb, and `version` or `--version` is the **only** argument.
+  Resolution is by `cli.command` (which may differ from the manifest name) or, in
+  js, a `cli.aliases` entry (`maw at version`); go, rs and zig do not read
+  `cli.aliases` for any verb yet. A folder name is never a way in: a stray copy
+  such as `herdrbak/` declaring an existing name is not answered.
+  `maw atlas version 2`, `maw atlas foo version` and `maw atlas -v` still reach
+  the plugin unchanged.
+- Prints `<name> <version> (<short commit>)` with the manifest `name`, whatever
+  command invoked it, and exits 0. The commit is `git rev-parse --short HEAD`
+  (never `git describe`: plugin checkouts never fetch new tags, so describe goes
+  stale), run inside the plugin directory with `--is-inside-work-tree`,
+  `GIT_OPTIONAL_LOCKS=0`, inherited `GIT_*` variables removed and a two-second
+  timeout. Running inside the directory resolves symlinks, so any Git work tree
+  the real directory lies in answers, including a larger repository that holds
+  the plugin in a subfolder. Otherwise it prints `(not a Git checkout)`; an unborn
+  HEAD, a missing or hanging git, or any other git failure do the same. It is
+  never an error.
+- A disabled plugin still refuses exactly as it does for any other verb. A
+  `maw-<name>` executable on PATH has no manifest and receives `version` as an
+  ordinary argument.
+- utils/scripts/dispatch-smoke.py covers it in every port: a plugin whose code
+  would print a sentinel answers without it, an alias answers with the manifest
+  name, extra arguments reach the plugin, stray or renamed folders are not
+  answered by folder name, and an own checkout, a symlink into a subfolder of a
+  larger repository, an enclosing repository, no repository, a hanging git and a
+  missing git each give the right suffix.
+
 Git installation does **not** download native prebuilts. For Herdr serving, use
 the native package from its CI separately, or explicitly run the complete source
 checkout with `serve --build` and Go installed. There is no automatic compiler

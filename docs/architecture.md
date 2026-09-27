@@ -49,6 +49,9 @@ Bun CLIs. Go calls `commands/plugins.ExecuteInstalled`, Rust `inventory::execute
 Bun `mod.executeInstalled` → `mod.findBun`/`mod.execute`, and Zig
 `inventory.resolve` → `Host.execute`. This fallback runs after built-ins/PATH;
 it does not import plugin modules or turn listing into runtime loading.
+The same functions answer the [reserved `version` verb](plugin-lifecycle.md#reserved-plugin-verb-version)
+from the manifest, reading the commit through Go `pluginCommit`, Rust
+`short_commit`, Bun `mod.pluginCommit` and Zig `shortCommit`.
 Root `package.json` exposes the Bun entrypoint as `maw-js` for direct GitHub bunx.
 Shared `utils/scripts/smoke.sh` exercises real processes with an isolated plugin PATH.
 Root `just` modules keep implementation-specific commands separate. Benchmark
