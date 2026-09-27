@@ -59,6 +59,11 @@ fi
 grep -q 'probe' "$tmp/help"
 run version > "$tmp/version"
 grep -q '^maw .' "$tmp/version"
+# A source build that reports its commit must use the release CalVer shape (#47).
+if grep -q '^maw dev v' "$tmp/version"; then
+    grep -Eq '^maw dev v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+ \([0-9a-f]{4,40}\)$' "$tmp/version" \
+        || fail 'dev version must read: maw dev vYY.M.D-alpha.HMM (hash)'
+fi
 run plugins > "$tmp/plugins-list"
 grep -q '^no plugins installed$' "$tmp/plugins-list"
 run plugin ls > "$tmp/plugin-ls"
