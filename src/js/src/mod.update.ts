@@ -14,7 +14,8 @@ import { version } from "./mod.showVersion";
 import type { UpdateError } from "./types";
 
 export const updateUsage = "maw update [alpha] [--check] [--version vYY.M.D-alpha.HMM]";
-export const updateSummary = "Update maw-js from verified alpha release assets, or fast-forward its source checkout (not plugins)";
+export const updateSummary = "Update maw-cli itself (not plugins)";
+export const updateDetails = "A compiled build replaces itself from verified maw-cli alpha release assets.\nA source checkout is fast-forwarded only; dirty or diverged is refused.\nPlugins update separately: maw plugin update <name>";
 const reinstall = "bun add --global 'git+https://github.com/Soul-Brews-Studio/maw-cli.git#alpha'";
 
 // Port of the Go updater: select a published alpha, verify its assets, prove
@@ -32,7 +33,7 @@ export async function update(args: string[]): Promise<number> {
     const flag = /^--?([^-=][^=]*)(?:=(.*))?$/.exec(argument);
     if (flag?.[1] === "check" && [undefined, "true", "false"].includes(flag[2])) check = flag[2] !== "false";
     else if (flag?.[1] === "version" && (flag[2] ?? args[n + 1]) !== undefined) tag = flag[2] ?? args[++n];
-    else if (flag?.[1] === "h" || flag?.[1] === "help") { console.log(`Usage: ${updateUsage}\n\n${updateSummary}`); return 0; }
+    else if (flag?.[1] === "h" || flag?.[1] === "help") { console.log(`Usage: ${updateUsage}\n\n${updateSummary}\n\n${updateDetails}`); return 0; }
     else return refuse(`usage: ${updateUsage}`, "maw update alpha --check");
   }
   if (channels.length > 1 || (tag && !tagPattern.test(tag))) return refuse(`usage: ${updateUsage}`, "maw update alpha --check");

@@ -2,6 +2,7 @@ export type Command = {
   name: string;
   summary: string;
   usage?: string;
+  details?: string;
   path?: string;
   run: (args: string[]) => number | Promise<number>;
 };
